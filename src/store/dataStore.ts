@@ -25,7 +25,7 @@ interface DataState {
   hydrate: (activeSessionId?: string) => Promise<void>;
   hydrateSessionData: (sessionId: string) => Promise<void>;
 
-  addUser: (input: { name: string; email: string; password: string; role?: string }) => Promise<User>;
+  addUser: (input: { name: string; email: string; password?: string; role?: string }) => Promise<User>;
   updateUser: (userId: string, patch: Partial<User>) => Promise<void>;
   removeUser: (userId: string) => Promise<void>;
 

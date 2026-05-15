@@ -25,6 +25,12 @@ const PORT = process.env.PORT || 3001;
 
 if (isProduction) {
   app.set('trust proxy', 1);
+  if (process.env.CORS_ORIGIN) {
+    app.use(cors({
+      origin: process.env.CORS_ORIGIN,
+      credentials: true,
+    }));
+  }
 } else {
   app.use(cors({
     origin: 'http://localhost:5173',
@@ -46,7 +52,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: false,
+    secure: isProduction,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));

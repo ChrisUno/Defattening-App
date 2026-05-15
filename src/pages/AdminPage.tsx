@@ -68,12 +68,12 @@ const AdminPage = () => {
 
   if (!currentAdmin || currentAdmin.role !== 'admin') return null;
 
-  const handleInvite = async (input: { name: string; email: string; password: string }) => {
+  const handleInvite = async (input: { name: string; email: string; password?: string }) => {
     try {
       const newUser = await addUser({
         name: input.name,
         email: input.email,
-        password: input.password,
+        ...(input.password ? { password: input.password } : {}),
         role: 'user',
       });
       pushToast({
@@ -313,13 +313,13 @@ const AdminPage = () => {
 interface InviteDialogProps {
   open: boolean;
   onClose: () => void;
-  onInvite: (input: { name: string; email: string; password: string }) => void;
+  onInvite: (input: { name: string; email: string; password?: string }) => void;
 }
 
 const InviteDialog = ({ open, onClose, onInvite }: InviteDialogProps) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [pwd, setPwd] = useState('password');
+  const [pwd, setPwd] = useState('');
   const [error, setError] = useState('');
 
   const submit = (e: React.FormEvent) => {
@@ -328,10 +328,10 @@ const InviteDialog = ({ open, onClose, onInvite }: InviteDialogProps) => {
       setError('Name and email are required.');
       return;
     }
-    onInvite({ name: name.trim(), email: email.trim(), password: pwd });
+    onInvite({ name: name.trim(), email: email.trim(), ...(pwd ? { password: pwd } : {}) });
     setName('');
     setEmail('');
-    setPwd('password');
+    setPwd('');
     setError('');
   };
 
@@ -345,7 +345,7 @@ const InviteDialog = ({ open, onClose, onInvite }: InviteDialogProps) => {
           Invite a team member
         </span>
       }
-      description="They'll be added immediately. (Real email invites land when MSAL ships.)"
+      description="They'll sign in with their Microsoft account. Set a password only if they need dev/local login."
     >
       <form onSubmit={submit} className="space-y-4">
         <div>
@@ -363,8 +363,8 @@ const InviteDialog = ({ open, onClose, onInvite }: InviteDialogProps) => {
           />
         </div>
         <div>
-          <Label>Temporary password</Label>
-          <Input value={pwd} onChange={(e) => setPwd(e.target.value)} />
+          <Label>Password <span className="text-ink-400 font-normal">(optional — only for dev login)</span></Label>
+          <Input value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Leave blank for Entra-only" />
         </div>
         {error && <p className="text-sm text-rose-bright font-medium">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">

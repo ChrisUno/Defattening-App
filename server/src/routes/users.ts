@@ -25,8 +25,8 @@ router.get('/', requireAuth, async (_req, res) => {
 
 router.post('/', requireAdmin, async (req, res) => {
   const { name, email, password, role } = req.body;
-  if (!name || !email || !password) {
-    res.status(400).json({ message: 'Name, email, and password are required' });
+  if (!name || !email) {
+    res.status(400).json({ message: 'Name and email are required' });
     return;
   }
 
@@ -37,7 +37,7 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 
   const id = `user-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  const passwordHash = bcrypt.hashSync(password, 10);
+  const passwordHash = password ? bcrypt.hashSync(password, 10) : null;
 
   await pool.query(
     `INSERT INTO users (id, email, password_hash, name, avatar_color, role) VALUES ($1, $2, $3, $4, $5, $6)`,

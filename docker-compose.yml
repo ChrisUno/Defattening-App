@@ -51,5 +51,33 @@ services:
     profiles:
       - seed
 
+  app:
+    build:
+      context: .
+      args:
+        VITE_ENTRA_TENANT_ID: ${VITE_ENTRA_TENANT_ID:-eedd1340-df1a-4db2-8a03-b4cfb1fa3e9d}
+        VITE_ENTRA_CLIENT_ID: ${VITE_ENTRA_CLIENT_ID:-1c4bfcb9-62fd-4a7d-aa85-5a7e74871c1b}
+        VITE_ENTRA_API_SCOPE: ${VITE_ENTRA_API_SCOPE:-api://34d4bbb3-6a41-4437-8717-9c07086c8e0a/access_as_user}
+    container_name: defattening-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: defattening
+      DB_USER: defattening
+      DB_PASSWORD: defattening
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-eedd1340-df1a-4db2-8a03-b4cfb1fa3e9d}
+      ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID:-34d4bbb3-6a41-4437-8717-9c07086c8e0a}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+    ports:
+      - "3001:3001"
+    profiles:
+      - deploy
+
 volumes:
   pgdata:
