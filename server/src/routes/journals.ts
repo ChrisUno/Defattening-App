@@ -1,19 +1,10 @@
 import { Router } from 'express';
-import db from '../db.js';
+import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-interface JournalRow {
-  id: string;
-  user_id: string;
-  session_id: string;
-  week_index: number;
-  content: string;
-  created_at: string;
-}
-
-const toJournal = (row: JournalRow) => ({
+const toJournal = (row: any) => ({
   id: row.id,
   userId: row.user_id,
   sessionId: row.session_id,
@@ -22,22 +13,22 @@ const toJournal = (row: JournalRow) => ({
   createdAt: row.created_at,
 });
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const { sessionId, userId } = req.query;
-  let rows: JournalRow[];
+  let rows: any[];
 
   if (sessionId && userId) {
-    rows = db.prepare('SELECT * FROM journals WHERE session_id = ? AND user_id = ? ORDER BY week_index').all(sessionId, userId) as JournalRow[];
+    ({ rows } = await pool.query('SELECT * FROM journals WHERE session_id = $1 AND user_id = $2 ORDER BY week_index', [sessionId, userId]));
   } else if (sessionId) {
-    rows = db.prepare('SELECT * FROM journals WHERE session_id = ? ORDER BY week_index').all(sessionId) as JournalRow[];
+    ({ rows } = await pool.query('SELECT * FROM journals WHERE session_id = $1 ORDER BY week_index', [sessionId]));
   } else {
-    rows = db.prepare('SELECT * FROM journals WHERE user_id = ? ORDER BY week_index').all(req.session.userId!) as JournalRow[];
+    ({ rows } = await pool.query('SELECT * FROM journals WHERE user_id = $1 ORDER BY week_index', [req.session.userId!]));
   }
 
   res.json(rows.map(toJournal));
 });
 
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const userId = req.session.userId!;
   const { sessionId, weekIndex, content } = req.body;
 
@@ -46,26 +37,28 @@ router.post('/', requireAuth, (req, res) => {
     return;
   }
 
-  const existing = db.prepare(
-    'SELECT id FROM journals WHERE user_id = ? AND session_id = ? AND week_index = ?'
-  ).get(userId, sessionId, weekIndex) as { id: string } | undefined;
+  const { rows: existing } = await pool.query(
+    'SELECT id FROM journals WHERE user_id = $1 AND session_id = $2 AND week_index = $3',
+    [userId, sessionId, weekIndex]
+  );
 
   const now = new Date().toISOString();
 
-  if (existing) {
-    db.prepare('UPDATE journals SET content = ?, created_at = ? WHERE id = ?').run(content, now, existing.id);
-    const row = db.prepare('SELECT * FROM journals WHERE id = ?').get(existing.id) as JournalRow;
-    res.json(toJournal(row));
+  if (existing.length > 0) {
+    await pool.query('UPDATE journals SET content = $1, created_at = $2 WHERE id = $3', [content, now, existing[0].id]);
+    const { rows } = await pool.query('SELECT * FROM journals WHERE id = $1', [existing[0].id]);
+    res.json(toJournal(rows[0]));
     return;
   }
 
   const id = `journal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  db.prepare(
-    `INSERT INTO journals (id, user_id, session_id, week_index, content) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, userId, sessionId, weekIndex, content);
+  await pool.query(
+    `INSERT INTO journals (id, user_id, session_id, week_index, content) VALUES ($1, $2, $3, $4, $5)`,
+    [id, userId, sessionId, weekIndex, content]
+  );
 
-  const row = db.prepare('SELECT * FROM journals WHERE id = ?').get(id) as JournalRow;
-  res.status(201).json(toJournal(row));
+  const { rows } = await pool.query('SELECT * FROM journals WHERE id = $1', [id]);
+  res.status(201).json(toJournal(rows[0]));
 });
 
 export default router;

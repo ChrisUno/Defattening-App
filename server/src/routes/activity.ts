@@ -1,21 +1,10 @@
 import { Router } from 'express';
-import db from '../db.js';
+import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-interface ActivityRow {
-  id: string;
-  type: string;
-  occurred_at: string;
-  session_id: string;
-  actor_user_id: string;
-  target_user_id: string;
-  actor_pct: number;
-  target_pct: number;
-}
-
-const toActivity = (row: ActivityRow) => ({
+const toActivity = (row: any) => ({
   id: row.id,
   type: row.type,
   occurredAt: row.occurred_at,
@@ -26,15 +15,16 @@ const toActivity = (row: ActivityRow) => ({
   targetPct: row.target_pct,
 });
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const { sessionId } = req.query;
   if (!sessionId) {
     res.status(400).json({ message: 'sessionId query param is required' });
     return;
   }
-  const rows = db.prepare(
-    'SELECT * FROM activity_entries WHERE session_id = ? ORDER BY occurred_at DESC LIMIT 40'
-  ).all(sessionId) as ActivityRow[];
+  const { rows } = await pool.query(
+    'SELECT * FROM activity_entries WHERE session_id = $1 ORDER BY occurred_at DESC LIMIT 40',
+    [sessionId]
+  );
   res.json(rows.map(toActivity));
 });
 

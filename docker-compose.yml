@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: defattening-db
+    environment:
+      POSTGRES_DB: defattening
+      POSTGRES_USER: defattening
+      POSTGRES_PASSWORD: defattening
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U defattening"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  flyway:
+    image: flyway/flyway:11
+    container_name: defattening-flyway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/flyway/sql
+    command: >
+      -url=jdbc:postgresql://postgres:5432/defattening
+      -user=defattening
+      -password=defattening
+      -connectRetries=5
+      migrate
+    profiles:
+      - migrate
+
+  flyway-seed:
+    image: flyway/flyway:11
+    container_name: defattening-flyway-seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/flyway/sql
+    command: >
+      -url=jdbc:postgresql://postgres:5432/defattening
+      -user=defattening
+      -password=defattening
+      -connectRetries=5
+      -target=latest
+      migrate
+    profiles:
+      - seed
+
+volumes:
+  pgdata:

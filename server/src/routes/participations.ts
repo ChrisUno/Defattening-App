@@ -1,19 +1,10 @@
 import { Router } from 'express';
-import db from '../db.js';
+import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-interface PartRow {
-  id: string;
-  user_id: string;
-  session_id: string;
-  start_weight_kg: number;
-  goal_weight_kg: number;
-  joined_at: string;
-}
-
-const toPart = (row: PartRow) => ({
+const toPart = (row: any) => ({
   id: row.id,
   userId: row.user_id,
   sessionId: row.session_id,
@@ -22,18 +13,15 @@ const toPart = (row: PartRow) => ({
   joinedAt: row.joined_at,
 });
 
-router.get('/', requireAuth, (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   const { sessionId } = req.query;
-  let rows: PartRow[];
-  if (sessionId) {
-    rows = db.prepare('SELECT * FROM participations WHERE session_id = ?').all(sessionId) as PartRow[];
-  } else {
-    rows = db.prepare('SELECT * FROM participations').all() as PartRow[];
-  }
+  const { rows } = sessionId
+    ? await pool.query('SELECT * FROM participations WHERE session_id = $1', [sessionId])
+    : await pool.query('SELECT * FROM participations');
   res.json(rows.map(toPart));
 });
 
-router.post('/', requireAuth, (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
   const userId = req.session.userId!;
   const { sessionId, startWeightKg, goalWeightKg } = req.body;
   if (!sessionId || !startWeightKg || !goalWeightKg) {
@@ -41,52 +29,55 @@ router.post('/', requireAuth, (req, res) => {
     return;
   }
 
-  const existing = db.prepare(
-    'SELECT * FROM participations WHERE user_id = ? AND session_id = ?'
-  ).get(userId, sessionId) as PartRow | undefined;
+  const { rows: existing } = await pool.query(
+    'SELECT * FROM participations WHERE user_id = $1 AND session_id = $2',
+    [userId, sessionId]
+  );
 
-  if (existing) {
-    db.prepare('UPDATE participations SET start_weight_kg = ?, goal_weight_kg = ? WHERE id = ?')
-      .run(startWeightKg, goalWeightKg, existing.id);
-    const updated = db.prepare('SELECT * FROM participations WHERE id = ?').get(existing.id) as PartRow;
-    res.json(toPart(updated));
+  if (existing.length > 0) {
+    await pool.query('UPDATE participations SET start_weight_kg = $1, goal_weight_kg = $2 WHERE id = $3',
+      [startWeightKg, goalWeightKg, existing[0].id]);
+    const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [existing[0].id]);
+    res.json(toPart(rows[0]));
     return;
   }
 
   const id = `part-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-  db.prepare(
-    `INSERT INTO participations (id, user_id, session_id, start_weight_kg, goal_weight_kg) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, userId, sessionId, startWeightKg, goalWeightKg);
+  await pool.query(
+    `INSERT INTO participations (id, user_id, session_id, start_weight_kg, goal_weight_kg) VALUES ($1, $2, $3, $4, $5)`,
+    [id, userId, sessionId, startWeightKg, goalWeightKg]
+  );
 
-  const row = db.prepare('SELECT * FROM participations WHERE id = ?').get(id) as PartRow;
-  res.status(201).json(toPart(row));
+  const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
+  res.status(201).json(toPart(rows[0]));
 });
 
-router.patch('/:id', requireAuth, (req, res) => {
+router.patch('/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const existing = db.prepare('SELECT * FROM participations WHERE id = ?').get(id) as PartRow | undefined;
-  if (!existing) {
+  const { rows: existing } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
+  if (existing.length === 0) {
     res.status(404).json({ message: 'Participation not found' });
     return;
   }
 
   const { startWeightKg, goalWeightKg } = req.body;
-  const updates: string[] = [];
+  const sets: string[] = [];
   const values: (number | string)[] = [];
+  let idx = 1;
 
-  if (startWeightKg !== undefined) { updates.push('start_weight_kg = ?'); values.push(startWeightKg); }
-  if (goalWeightKg !== undefined) { updates.push('goal_weight_kg = ?'); values.push(goalWeightKg); }
+  if (startWeightKg !== undefined) { sets.push(`start_weight_kg = $${idx++}`); values.push(startWeightKg); }
+  if (goalWeightKg !== undefined) { sets.push(`goal_weight_kg = $${idx++}`); values.push(goalWeightKg); }
 
-  if (updates.length === 0) {
+  if (sets.length === 0) {
     res.status(400).json({ message: 'No valid fields to update' });
     return;
   }
 
   values.push(id);
-  db.prepare(`UPDATE participations SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  await pool.query(`UPDATE participations SET ${sets.join(', ')} WHERE id = $${idx}`, values);
 
-  const row = db.prepare('SELECT * FROM participations WHERE id = ?').get(id) as PartRow;
-  res.json(toPart(row));
+  const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
+  res.json(toPart(rows[0]));
 });
 
 export default router;

@@ -1,11 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
-import connectSqlite3 from 'connect-sqlite3';
+import connectPgSimple from 'connect-pg-simple';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
+import pool from './db.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -16,7 +17,7 @@ import journalRoutes from './routes/journals.js';
 import activityRoutes from './routes/activity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SQLiteStore = connectSqlite3(session);
+const PgStore = connectPgSimple(session);
 const isProduction = process.env.NODE_ENV === 'production';
 
 const app = express();
@@ -34,9 +35,10 @@ if (isProduction) {
 app.use(express.json());
 
 app.use(session({
-  store: new (SQLiteStore as any)({
-    dir: path.join(__dirname, '..', 'data'),
-    db: 'sessions.db',
+  store: new PgStore({
+    pool,
+    tableName: 'http_sessions',
+    createTableIfMissing: false,
   }),
   secret: process.env.SESSION_SECRET || 'defattening-secret-key-change-in-prod',
   resave: false,

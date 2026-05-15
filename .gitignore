@@ -47,3 +47,4 @@ server/node_modules/
 
 # Playwright
 .playwright-mcp/
+*.png

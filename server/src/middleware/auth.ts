@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import db from '../db.js';
+import pool from '../db.js';
 
 declare module 'express-session' {
   interface SessionData {
@@ -15,13 +15,13 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
   next();
 };
 
-export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.userId) {
     res.status(401).json({ message: 'Authentication required' });
     return;
   }
-  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.session.userId) as { role: string } | undefined;
-  if (!user || user.role !== 'admin') {
+  const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [req.session.userId]);
+  if (!rows[0] || rows[0].role !== 'admin') {
     res.status(403).json({ message: 'Admin access required' });
     return;
   }

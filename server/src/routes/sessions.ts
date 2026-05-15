@@ -1,22 +1,10 @@
 import { Router } from 'express';
-import db from '../db.js';
+import pool from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 
 const router = Router();
 
-interface SessionRow {
-  id: string;
-  name: string;
-  description: string;
-  weeks: number;
-  weigh_in_day_of_week: number;
-  weigh_in_note: string;
-  start_date: string;
-  status: string;
-  created_by: string;
-}
-
-const toSession = (row: SessionRow) => ({
+const toSession = (row: any) => ({
   id: row.id,
   name: row.name,
   description: row.description,
@@ -28,12 +16,12 @@ const toSession = (row: SessionRow) => ({
   createdBy: row.created_by,
 });
 
-router.get('/', requireAuth, (_req, res) => {
-  const rows = db.prepare('SELECT * FROM sessions ORDER BY start_date DESC').all() as SessionRow[];
+router.get('/', requireAuth, async (_req, res) => {
+  const { rows } = await pool.query('SELECT * FROM sessions ORDER BY start_date DESC');
   res.json(rows.map(toSession));
 });
 
-router.post('/', requireAdmin, (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const { name, description, weeks, weighInDayOfWeek, weighInNote, startDate, status } = req.body;
   if (!name || !weeks || !startDate) {
     res.status(400).json({ message: 'Name, weeks, and start date are required' });
@@ -42,60 +30,62 @@ router.post('/', requireAdmin, (req, res) => {
 
   const id = `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
-  db.prepare(
+  await pool.query(
     `INSERT INTO sessions (id, name, description, weeks, weigh_in_day_of_week, weigh_in_note, start_date, status, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, name, description || '', weeks, weighInDayOfWeek ?? 1, weighInNote || '', startDate, status || 'upcoming', req.session.userId!);
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [id, name, description || '', weeks, weighInDayOfWeek ?? 1, weighInNote || '', startDate, status || 'upcoming', req.session.userId!]
+  );
 
-  const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow;
-  res.status(201).json(toSession(row));
+  const { rows } = await pool.query('SELECT * FROM sessions WHERE id = $1', [id]);
+  res.status(201).json(toSession(rows[0]));
 });
 
-router.patch('/:id', requireAdmin, (req, res) => {
+router.patch('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const existing = db.prepare('SELECT id FROM sessions WHERE id = ?').get(id);
-  if (!existing) {
+  const { rows: existing } = await pool.query('SELECT id FROM sessions WHERE id = $1', [id]);
+  if (existing.length === 0) {
     res.status(404).json({ message: 'Session not found' });
     return;
   }
 
   const { name, description, weeks, weighInDayOfWeek, weighInNote, startDate, status } = req.body;
-  const updates: string[] = [];
+  const sets: string[] = [];
   const values: (string | number)[] = [];
+  let idx = 1;
 
-  if (name !== undefined) { updates.push('name = ?'); values.push(name); }
-  if (description !== undefined) { updates.push('description = ?'); values.push(description); }
-  if (weeks !== undefined) { updates.push('weeks = ?'); values.push(weeks); }
-  if (weighInDayOfWeek !== undefined) { updates.push('weigh_in_day_of_week = ?'); values.push(weighInDayOfWeek); }
-  if (weighInNote !== undefined) { updates.push('weigh_in_note = ?'); values.push(weighInNote); }
-  if (startDate !== undefined) { updates.push('start_date = ?'); values.push(startDate); }
-  if (status !== undefined) { updates.push('status = ?'); values.push(status); }
+  if (name !== undefined) { sets.push(`name = $${idx++}`); values.push(name); }
+  if (description !== undefined) { sets.push(`description = $${idx++}`); values.push(description); }
+  if (weeks !== undefined) { sets.push(`weeks = $${idx++}`); values.push(weeks); }
+  if (weighInDayOfWeek !== undefined) { sets.push(`weigh_in_day_of_week = $${idx++}`); values.push(weighInDayOfWeek); }
+  if (weighInNote !== undefined) { sets.push(`weigh_in_note = $${idx++}`); values.push(weighInNote); }
+  if (startDate !== undefined) { sets.push(`start_date = $${idx++}`); values.push(startDate); }
+  if (status !== undefined) { sets.push(`status = $${idx++}`); values.push(status); }
 
-  if (updates.length === 0) {
+  if (sets.length === 0) {
     res.status(400).json({ message: 'No valid fields to update' });
     return;
   }
 
   values.push(id);
-  db.prepare(`UPDATE sessions SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+  await pool.query(`UPDATE sessions SET ${sets.join(', ')} WHERE id = $${idx}`, values);
 
-  const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow;
-  res.json(toSession(row));
+  const { rows } = await pool.query('SELECT * FROM sessions WHERE id = $1', [id]);
+  res.json(toSession(rows[0]));
 });
 
-router.delete('/:id', requireAdmin, (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
-  const existing = db.prepare('SELECT id FROM sessions WHERE id = ?').get(id);
-  if (!existing) {
+  const { rows } = await pool.query('SELECT id FROM sessions WHERE id = $1', [id]);
+  if (rows.length === 0) {
     res.status(404).json({ message: 'Session not found' });
     return;
   }
 
-  db.prepare('DELETE FROM activity_entries WHERE session_id = ?').run(id);
-  db.prepare('DELETE FROM journals WHERE session_id = ?').run(id);
-  db.prepare('DELETE FROM weigh_ins WHERE session_id = ?').run(id);
-  db.prepare('DELETE FROM participations WHERE session_id = ?').run(id);
-  db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+  await pool.query('DELETE FROM activity_entries WHERE session_id = $1', [id]);
+  await pool.query('DELETE FROM journals WHERE session_id = $1', [id]);
+  await pool.query('DELETE FROM weigh_ins WHERE session_id = $1', [id]);
+  await pool.query('DELETE FROM participations WHERE session_id = $1', [id]);
+  await pool.query('DELETE FROM sessions WHERE id = $1', [id]);
   res.json({ ok: true });
 });
 

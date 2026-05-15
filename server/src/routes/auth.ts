@@ -1,22 +1,11 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import db from '../db.js';
+import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-interface UserRow {
-  id: string;
-  email: string;
-  password_hash: string;
-  name: string;
-  avatar_color: string;
-  role: string;
-  height_cm: number | null;
-  created_at: string;
-}
-
-const toUserResponse = (row: UserRow) => ({
+const toUserResponse = (row: any) => ({
   id: row.id,
   email: row.email,
   name: row.name,
@@ -26,24 +15,26 @@ const toUserResponse = (row: UserRow) => ({
   createdAt: row.created_at,
 });
 
-const hasActiveParticipation = (userId: string): boolean => {
-  const row = db.prepare(`
-    SELECT 1 FROM participations p
-    JOIN sessions s ON s.id = p.session_id
-    WHERE p.user_id = ? AND s.status IN ('active', 'upcoming')
-    LIMIT 1
-  `).get(userId);
-  return !!row;
+const hasActiveParticipation = async (userId: string): Promise<boolean> => {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM participations p
+     JOIN sessions s ON s.id = p.session_id
+     WHERE p.user_id = $1 AND s.status IN ('active', 'upcoming')
+     LIMIT 1`,
+    [userId]
+  );
+  return rows.length > 0;
 };
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ message: 'Email and password are required' });
     return;
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase()) as UserRow | undefined;
+  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email.trim().toLowerCase()]);
+  const user = rows[0];
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     res.status(401).json({ message: 'Invalid email or password' });
     return;
@@ -52,7 +43,7 @@ router.post('/login', (req, res) => {
   req.session.userId = user.id;
   res.json({
     user: toUserResponse(user),
-    hasActiveParticipation: hasActiveParticipation(user.id),
+    hasActiveParticipation: await hasActiveParticipation(user.id),
   });
 });
 
@@ -67,15 +58,16 @@ router.post('/logout', requireAuth, (req, res) => {
   });
 });
 
-router.get('/me', requireAuth, (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId!) as UserRow | undefined;
+router.get('/me', requireAuth, async (req, res) => {
+  const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId!]);
+  const user = rows[0];
   if (!user) {
     res.status(401).json({ message: 'User not found' });
     return;
   }
   res.json({
     user: toUserResponse(user),
-    hasActiveParticipation: hasActiveParticipation(user.id),
+    hasActiveParticipation: await hasActiveParticipation(user.id),
   });
 });
 
