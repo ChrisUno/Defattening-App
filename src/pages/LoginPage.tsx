@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
-import { Flame, ArrowRight, Sparkles, Trophy, Crown, Sun, Moon } from 'lucide-react';
+import { Flame, ArrowRight, Sparkles, Trophy, Crown, Sun, Moon, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
@@ -14,9 +14,19 @@ const demoUsers = [
   { label: 'Sign in as Admin (Sam)', email: 'admin@unosquare.com', pw: 'admin123' },
 ];
 
+const MicrosoftIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+    <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+    <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+    <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+  </svg>
+);
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const signIn = useAuthStore((s) => s.signIn);
+  const signInWithEntra = useAuthStore((s) => s.signInWithEntra);
   const currentUser = useAuthStore((s) => s.currentUser);
   const hasActiveParticipation = useAuthStore((s) => s.hasActiveParticipation);
   const hydrate = useDataStore((s) => s.hydrate);
@@ -35,6 +45,35 @@ const LoginPage = () => {
   const [password, setPassword] = useState('password123');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [entraLoading, setEntraLoading] = useState(false);
+  const [devExpanded, setDevExpanded] = useState(import.meta.env.DEV);
+
+  const navigateAfterLogin = () => {
+    const { currentUser, hasActiveParticipation } = useAuthStore.getState();
+    if (currentUser?.role === 'admin') { navigate('/admin'); return; }
+    navigate(hasActiveParticipation ? '/dashboard' : '/onboarding');
+  };
+
+  const handleEntraSignIn = async () => {
+    setError('');
+    setEntraLoading(true);
+    try {
+      await signInWithEntra();
+      await hydrate();
+      const { currentUser } = useAuthStore.getState();
+      pushToast({
+        title: `Welcome, ${currentUser?.name.split(' ')[0]}!`,
+        description: 'Signed in with Microsoft.',
+        variant: 'success',
+      });
+      navigateAfterLogin();
+    } catch (err: any) {
+      if (err?.errorCode === 'user_cancelled') return;
+      setError(err.message || 'Microsoft sign-in failed.');
+    } finally {
+      setEntraLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,14 +82,13 @@ const LoginPage = () => {
     try {
       await signIn(email, password);
       await hydrate();
-      const { currentUser, hasActiveParticipation } = useAuthStore.getState();
+      const { currentUser } = useAuthStore.getState();
       pushToast({
         title: `Welcome back, ${currentUser?.name.split(' ')[0]}!`,
         description: 'Time to make this week count.',
         variant: 'success',
       });
-      if (currentUser?.role === 'admin') { navigate('/admin'); return; }
-      navigate(hasActiveParticipation ? '/dashboard' : '/onboarding');
+      navigateAfterLogin();
     } catch (err: any) {
       setError(err.message || 'Invalid email or password.');
     } finally {
@@ -141,66 +179,108 @@ const LoginPage = () => {
               </div>
               <h2 className="mt-5 font-display text-3xl font-bold">Sign in</h2>
               <p className="mt-1 text-sm text-ink-500">
-                Email + password for now · MSAL / Azure coming soon
+                Use your Unosquare Microsoft account
               </p>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-                <div>
-                  <Label htmlFor="email">Work email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@unosquare.com"
-                    required
-                  />
+              {error && (
+                <div className="mt-4 rounded-xl border-2 border-rose-bright/40 bg-rose-bright/10 px-3 py-2 text-sm font-medium text-rose-bright">
+                  {error}
                 </div>
-                <div>
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
+              )}
 
-                {error && (
-                  <div className="rounded-xl border-2 border-rose-bright/40 bg-rose-bright/10 px-3 py-2 text-sm font-medium text-rose-bright">
-                    {error}
-                  </div>
+              <button
+                type="button"
+                onClick={handleEntraSignIn}
+                disabled={entraLoading || loading}
+                className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border-2 border-ink-900/15 bg-white px-5 py-3.5 text-sm font-semibold text-ink-900 shadow-sm hover:bg-ink-50 hover:border-ink-900/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {entraLoading ? (
+                  <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-ink-300 border-t-ink-900" />
+                ) : (
+                  <MicrosoftIcon />
                 )}
+                {entraLoading ? 'Signing in…' : 'Sign in with Microsoft'}
+              </button>
 
-                <Button type="submit" size="lg" className="w-full" rightIcon={<ArrowRight size={18} />} disabled={loading}>
-                  {loading ? 'Signing in…' : "Let's go"}
-                </Button>
-              </form>
+              <div className="mt-6 flex items-center gap-3">
+                <div className="flex-1 h-px bg-ink-900/10" />
+                <span className="text-xs font-medium text-ink-400 uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-ink-900/10" />
+              </div>
 
-              <div className="mt-6">
-                <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500 mb-2">
-                  Demo logins
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {demoUsers.map((d) => (
-                    <button
-                      key={d.email}
-                      onClick={() => quickSignIn(d.email, d.pw)}
-                      type="button"
-                      className="rounded-xl border-2 border-ink-900/10 bg-cream-100 px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:border-tangerine-300 hover:bg-tangerine-50"
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-3 text-[11px] text-ink-500">
-                  Password for users is <span className="font-mono font-bold">password123</span>, admin is{' '}
-                  <span className="font-mono font-bold">admin123</span>.
-                </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setDevExpanded(!devExpanded)}
+                  className="flex items-center gap-2 text-xs font-bold text-ink-500 hover:text-ink-700 transition-colors uppercase tracking-wider"
+                >
+                  <ChevronDown
+                    size={14}
+                    className={cn('transition-transform', devExpanded && 'rotate-180')}
+                  />
+                  Sign in with email {!import.meta.env.DEV ? '' : '(dev)'}
+                </button>
+
+                {devExpanded && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+                      <div>
+                        <Label htmlFor="email">Work email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          autoComplete="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@unosquare.com"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          autoComplete="current-password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                        />
+                      </div>
+
+                      <Button type="submit" size="lg" className="w-full" rightIcon={<ArrowRight size={18} />} disabled={loading || entraLoading}>
+                        {loading ? 'Signing in…' : "Let's go"}
+                      </Button>
+                    </form>
+
+                    <div className="mt-5">
+                      <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500 mb-2">
+                        Demo logins
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {demoUsers.map((d) => (
+                          <button
+                            key={d.email}
+                            onClick={() => quickSignIn(d.email, d.pw)}
+                            type="button"
+                            className="rounded-xl border-2 border-ink-900/10 bg-cream-100 px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:border-tangerine-300 hover:bg-tangerine-50"
+                          >
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[11px] text-ink-500">
+                        Password for users is <span className="font-mono font-bold">password123</span>, admin is{' '}
+                        <span className="font-mono font-bold">admin123</span>.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
               </div>
             </div>
           </div>

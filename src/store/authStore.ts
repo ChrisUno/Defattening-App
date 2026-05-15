@@ -15,6 +15,7 @@ interface AuthState {
 
   checkSession: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithEntra: () => Promise<void>;
   signOut: () => Promise<void>;
   setHasActiveParticipation: (val: boolean) => void;
   updateCurrentUser: (patch: Partial<User>) => void;
@@ -55,12 +56,29 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
+  signInWithEntra: async () => {
+    const { msalInstance, loginRequest } = await import('../lib/msalConfig');
+    await msalInstance.initialize();
+    const result = await msalInstance.loginPopup(loginRequest);
+    const data = await api.postWithBearer<AuthResponse>('/api/auth/entra', result.accessToken);
+    set({
+      currentUser: data.user,
+      hasActiveParticipation: data.hasActiveParticipation,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+  },
+
   signOut: async () => {
     try {
       await api.post('/api/auth/logout');
-    } catch {
-      // best-effort
-    }
+    } catch {}
+    try {
+      const { msalInstance } = await import('../lib/msalConfig');
+      await msalInstance.initialize();
+      const account = msalInstance.getActiveAccount();
+      if (account) await msalInstance.logoutPopup({ account });
+    } catch {}
     set({
       currentUser: null,
       hasActiveParticipation: false,
