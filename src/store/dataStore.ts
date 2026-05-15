@@ -1,10 +1,6 @@
 import { create } from 'zustand';
-import { buildInitialData } from '../lib/mockData';
-import {
-  computeLeaderboard,
-  computeRanksForSession,
-  currentWeekIndex,
-} from './../lib/stats';
+import { api } from '../lib/api';
+import { useAuthStore } from './authStore';
 import type {
   ActivityEntry,
   JournalEntry,
@@ -22,253 +18,192 @@ interface DataState {
   journals: JournalEntry[];
   activityFeed: ActivityEntry[];
   activeSessionId: string;
+  isHydrated: boolean;
 
   setActiveSession: (sessionId: string) => void;
 
-  addUser: (input: Omit<User, 'id' | 'createdAt' | 'avatarColor'> & { avatarColor?: string }) => User;
-  updateUser: (userId: string, patch: Partial<User>) => void;
-  removeUser: (userId: string) => void;
+  hydrate: (activeSessionId?: string) => Promise<void>;
+  hydrateSessionData: (sessionId: string) => Promise<void>;
 
-  joinSession: (input: Omit<Participation, 'id' | 'joinedAt'>) => Participation;
-  updateParticipation: (id: string, patch: Partial<Participation>) => void;
+  addUser: (input: { name: string; email: string; password: string; role?: string }) => Promise<User>;
+  updateUser: (userId: string, patch: Partial<User>) => Promise<void>;
+  removeUser: (userId: string) => Promise<void>;
 
-  recordWeighIn: (input: Omit<WeighIn, 'id' | 'recordedAt' | 'measuredAt'> & { measuredAt?: string }) => {
-    weighIn: WeighIn;
-    overtakes: ActivityEntry[];
-  };
-  saveJournal: (input: Omit<JournalEntry, 'id' | 'createdAt'>) => JournalEntry;
+  joinSession: (input: { sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
+  updateParticipation: (id: string, patch: Partial<Participation>) => Promise<void>;
 
-  createSession: (input: Omit<Session, 'id' | 'status' | 'createdBy'> & {
-    status?: Session['status'];
-    createdBy: string;
-  }) => Session;
-  updateSession: (id: string, patch: Partial<Session>) => void;
-  removeSession: (id: string) => void;
+  recordWeighIn: (input: {
+    sessionId: string; weightKg: number; bodyFatPct?: number;
+    weekIndex: number; measuredAt?: string;
+  }) => Promise<{ weighIn: WeighIn; overtakes: ActivityEntry[] }>;
+
+  saveJournal: (input: { sessionId: string; weekIndex: number; content: string }) => Promise<JournalEntry>;
+
+  createSession: (input: Omit<Session, 'id' | 'status' | 'createdBy'> & { status?: string }) => Promise<Session>;
+  updateSession: (id: string, patch: Partial<Session>) => Promise<void>;
+  removeSession: (id: string) => Promise<void>;
 }
 
-const seed = buildInitialData();
+export const useDataStore = create<DataState>((set, get) => ({
+  users: [],
+  sessions: [],
+  participations: [],
+  weighIns: [],
+  journals: [],
+  activityFeed: [],
+  activeSessionId: '',
+  isHydrated: false,
 
-let counter = 0;
-const uid = (prefix: string) => {
-  counter += 1;
-  return `${prefix}-${Date.now().toString(36)}-${counter}`;
-};
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId });
+    get().hydrateSessionData(sessionId);
+  },
 
-export const useDataStore = create<DataState>((set) => ({
-  ...seed,
-  activeSessionId: 'session-spring-2026',
+  hydrate: async (sessionId?) => {
+    const [users, sessions, participations] = await Promise.all([
+      api.get<User[]>('/api/users'),
+      api.get<Session[]>('/api/sessions'),
+      api.get<Participation[]>('/api/participations'),
+    ]);
 
-  setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+    const active = sessionId
+      || sessions.find((s) => s.status === 'active')?.id
+      || sessions[0]?.id
+      || '';
 
-  addUser: (input) => {
-    const newUser: User = {
-      id: uid('user'),
-      email: input.email,
-      password: input.password,
-      name: input.name,
-      role: input.role,
-      avatarColor: input.avatarColor ?? '#2563EB',
-      createdAt: new Date().toISOString(),
-    };
-    set((state) => ({ users: [...state.users, newUser] }));
+    let weighIns: WeighIn[] = [];
+    let journals: JournalEntry[] = [];
+    let activityFeed: ActivityEntry[] = [];
+
+    if (active) {
+      [weighIns, journals, activityFeed] = await Promise.all([
+        api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${active}`),
+        api.get<JournalEntry[]>(`/api/journals?sessionId=${active}`),
+        api.get<ActivityEntry[]>(`/api/activity?sessionId=${active}`),
+      ]);
+    }
+
+    set({ users, sessions, participations, weighIns, journals, activityFeed, activeSessionId: active, isHydrated: true });
+  },
+
+  hydrateSessionData: async (sessionId) => {
+    if (!sessionId) return;
+    const [weighIns, journals, activityFeed] = await Promise.all([
+      api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${sessionId}`),
+      api.get<JournalEntry[]>(`/api/journals?sessionId=${sessionId}`),
+      api.get<ActivityEntry[]>(`/api/activity?sessionId=${sessionId}`),
+    ]);
+    set({ weighIns, journals, activityFeed });
+  },
+
+  addUser: async (input) => {
+    const newUser = await api.post<User>('/api/users', input);
+    set((s) => ({ users: [...s.users, newUser] }));
     return newUser;
   },
 
-  updateUser: (userId, patch) =>
-    set((state) => ({
-      users: state.users.map((u) => (u.id === userId ? { ...u, ...patch } : u)),
-    })),
+  updateUser: async (userId, patch) => {
+    const updated = await api.patch<User>(`/api/users/${userId}`, patch);
+    set((s) => ({
+      users: s.users.map((u) => (u.id === userId ? { ...u, ...updated } : u)),
+    }));
+    const { currentUser } = useAuthStore.getState();
+    if (currentUser && currentUser.id === userId) {
+      useAuthStore.getState().updateCurrentUser(updated);
+    }
+  },
 
-  removeUser: (userId) =>
-    set((state) => ({
-      users: state.users.filter((u) => u.id !== userId),
-      participations: state.participations.filter((p) => p.userId !== userId),
-      weighIns: state.weighIns.filter((w) => w.userId !== userId),
-      journals: state.journals.filter((j) => j.userId !== userId),
-    })),
+  removeUser: async (userId) => {
+    await api.delete(`/api/users/${userId}`);
+    set((s) => ({
+      users: s.users.filter((u) => u.id !== userId),
+      participations: s.participations.filter((p) => p.userId !== userId),
+      weighIns: s.weighIns.filter((w) => w.userId !== userId),
+      journals: s.journals.filter((j) => j.userId !== userId),
+    }));
+  },
 
-  joinSession: (input) => {
-    const part: Participation = {
-      ...input,
-      id: uid('part'),
-      joinedAt: new Date().toISOString(),
-    };
-    set((state) => {
-      const existing = state.participations.find(
-        (p) => p.userId === input.userId && p.sessionId === input.sessionId,
+  joinSession: async (input) => {
+    const part = await api.post<Participation>('/api/participations', input);
+    set((s) => {
+      const existing = s.participations.find(
+        (p) => p.userId === part.userId && p.sessionId === part.sessionId,
       );
       if (existing) {
         return {
-          participations: state.participations.map((p) =>
-            p.id === existing.id ? { ...p, ...input } : p,
-          ),
+          participations: s.participations.map((p) => (p.id === existing.id ? part : p)),
         };
       }
-      return { participations: [...state.participations, part] };
+      return { participations: [...s.participations, part] };
     });
     return part;
   },
 
-  updateParticipation: (id, patch) =>
-    set((state) => ({
-      participations: state.participations.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    })),
-
-  recordWeighIn: (input) => {
-    const now = new Date().toISOString();
-    const entry: WeighIn = {
-      id: uid('weighin'),
-      userId: input.userId,
-      sessionId: input.sessionId,
-      weightKg: input.weightKg,
-      bodyFatPct: input.bodyFatPct,
-      weekIndex: input.weekIndex,
-      measuredAt: input.measuredAt ?? now,
-      recordedAt: now,
-    };
-
-    let overtakes: ActivityEntry[] = [];
-
-    set((state) => {
-      const session = state.sessions.find((s) => s.id === input.sessionId);
-      const ranksBefore = session
-        ? computeRanksForSession(
-            computeLeaderboard(
-              session,
-              state.users,
-              state.participations,
-              state.weighIns,
-              currentWeekIndex(session),
-            ),
-          )
-        : {};
-
-      const existing = state.weighIns.find(
-        (w) =>
-          w.userId === input.userId &&
-          w.sessionId === input.sessionId &&
-          w.weekIndex === input.weekIndex,
-      );
-
-      const nextWeighIns = existing
-        ? state.weighIns.map((w) =>
-            w.id === existing.id
-              ? {
-                  ...w,
-                  weightKg: input.weightKg,
-                  bodyFatPct: input.bodyFatPct,
-                  measuredAt: entry.measuredAt,
-                  recordedAt: entry.recordedAt,
-                }
-              : w,
-          )
-        : [...state.weighIns, entry];
-
-      let nextActivity = state.activityFeed;
-
-      if (session) {
-        const boardAfter = computeLeaderboard(
-          session,
-          state.users,
-          state.participations,
-          nextWeighIns,
-          currentWeekIndex(session),
-        );
-        const ranksAfter = computeRanksForSession(boardAfter);
-
-        const detected: ActivityEntry[] = [];
-        for (const actor of boardAfter) {
-          const prev = ranksBefore[actor.userId];
-          const next = ranksAfter[actor.userId];
-          if (prev == null || next == null) continue;
-          if (next < prev) {
-            for (const target of boardAfter) {
-              if (target.userId === actor.userId) continue;
-              const tPrev = ranksBefore[target.userId];
-              const tNext = ranksAfter[target.userId];
-              if (tPrev == null || tNext == null) continue;
-              if (tPrev < prev && tNext > next) {
-                detected.push({
-                  id: uid('activity'),
-                  type: 'overtake',
-                  occurredAt: now,
-                  sessionId: input.sessionId,
-                  actorUserId: actor.userId,
-                  targetUserId: target.userId,
-                  actorPct: actor.cumulativePct,
-                  targetPct: target.cumulativePct,
-                });
-              }
-            }
-          }
-        }
-
-        overtakes = detected;
-        if (detected.length > 0) {
-          nextActivity = [...detected, ...state.activityFeed].slice(0, 40);
-        }
-      }
-
-      return {
-        weighIns: nextWeighIns,
-        activityFeed: nextActivity,
-      };
-    });
-
-    return { weighIn: entry, overtakes };
+  updateParticipation: async (id, patch) => {
+    const updated = await api.patch<Participation>(`/api/participations/${id}`, patch);
+    set((s) => ({
+      participations: s.participations.map((p) => (p.id === id ? { ...p, ...updated } : p)),
+    }));
   },
 
-  saveJournal: (input) => {
-    const entry: JournalEntry = {
-      ...input,
-      id: uid('journal'),
-      createdAt: new Date().toISOString(),
-    };
-    set((state) => {
-      const existing = state.journals.find(
-        (j) =>
-          j.userId === input.userId &&
-          j.sessionId === input.sessionId &&
-          j.weekIndex === input.weekIndex,
+  recordWeighIn: async (input) => {
+    const result = await api.post<{ weighIn: WeighIn; overtakes: ActivityEntry[] }>('/api/weigh-ins', input);
+
+    set((s) => {
+      const existing = s.weighIns.find(
+        (w) => w.userId === result.weighIn.userId && w.sessionId === result.weighIn.sessionId && w.weekIndex === result.weighIn.weekIndex,
+      );
+      const nextWeighIns = existing
+        ? s.weighIns.map((w) => (w.id === existing.id ? result.weighIn : w))
+        : [...s.weighIns, result.weighIn];
+
+      let nextActivity = s.activityFeed;
+      if (result.overtakes.length > 0) {
+        nextActivity = [...result.overtakes, ...s.activityFeed].slice(0, 40);
+      }
+
+      return { weighIns: nextWeighIns, activityFeed: nextActivity };
+    });
+
+    return result;
+  },
+
+  saveJournal: async (input) => {
+    const entry = await api.post<JournalEntry>('/api/journals', input);
+    set((s) => {
+      const existing = s.journals.find(
+        (j) => j.userId === entry.userId && j.sessionId === entry.sessionId && j.weekIndex === entry.weekIndex,
       );
       if (existing) {
         return {
-          journals: state.journals.map((j) =>
-            j.id === existing.id ? { ...j, content: input.content, createdAt: entry.createdAt } : j,
-          ),
+          journals: s.journals.map((j) => (j.id === existing.id ? entry : j)),
         };
       }
-      return { journals: [...state.journals, entry] };
+      return { journals: [...s.journals, entry] };
     });
     return entry;
   },
 
-  createSession: (input) => {
-    const session: Session = {
-      id: uid('session'),
-      name: input.name,
-      description: input.description,
-      weeks: input.weeks,
-      weighInDayOfWeek: input.weighInDayOfWeek,
-      weighInNote: input.weighInNote,
-      startDate: input.startDate,
-      status: input.status ?? 'upcoming',
-      createdBy: input.createdBy,
-    };
-    set((state) => ({ sessions: [...state.sessions, session] }));
+  createSession: async (input) => {
+    const session = await api.post<Session>('/api/sessions', input);
+    set((s) => ({ sessions: [...s.sessions, session] }));
     return session;
   },
 
-  updateSession: (id, patch) =>
-    set((state) => ({
-      sessions: state.sessions.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-    })),
+  updateSession: async (id, patch) => {
+    const updated = await api.patch<Session>(`/api/sessions/${id}`, patch);
+    set((s) => ({
+      sessions: s.sessions.map((sess) => (sess.id === id ? { ...sess, ...updated } : sess)),
+    }));
+  },
 
-  removeSession: (id) =>
-    set((state) => ({
-      sessions: state.sessions.filter((s) => s.id !== id),
-      participations: state.participations.filter((p) => p.sessionId !== id),
-      weighIns: state.weighIns.filter((w) => w.sessionId !== id),
-      journals: state.journals.filter((j) => j.sessionId !== id),
-    })),
+  removeSession: async (id) => {
+    await api.delete(`/api/sessions/${id}`);
+    set((s) => ({
+      sessions: s.sessions.filter((sess) => sess.id !== id),
+      participations: s.participations.filter((p) => p.sessionId !== id),
+      weighIns: s.weighIns.filter((w) => w.sessionId !== id),
+      journals: s.journals.filter((j) => j.sessionId !== id),
+    }));
+  },
 }));

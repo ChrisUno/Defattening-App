@@ -1,8 +1,7 @@
 import { type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router';
 import { LayoutDashboard, Trophy, Shield, UserCircle2, LogOut, Flame, Sun, Moon } from 'lucide-react';
-import { useAuthStore, useCurrentUser } from '../store/authStore';
-import { useDataStore } from '../store/dataStore';
+import { useAuthStore } from '../store/authStore';
 import { useUiStore } from '../store/uiStore';
 import { Avatar } from './ui/Avatar';
 import { cn } from '../lib/cn';
@@ -20,8 +19,7 @@ const navLinks = [
 export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const signOut = useAuthStore((s) => s.signOut);
-  const users = useDataStore((s) => s.users);
-  const user = useCurrentUser(users);
+  const user = useAuthStore((s) => s.currentUser);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
 
@@ -35,6 +33,11 @@ export const Layout = ({ children }: LayoutProps) => {
         { to: '/profile', label: 'Profile', icon: UserCircle2 },
       ]
     : navLinks;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <div className="min-h-screen">
@@ -100,10 +103,7 @@ export const Layout = ({ children }: LayoutProps) => {
               </button>
               <Avatar name={user.name} color={user.avatarColor} size="md" />
               <button
-                onClick={() => {
-                  signOut();
-                  navigate('/');
-                }}
+                onClick={handleSignOut}
                 title="Sign out"
                 aria-label="Sign out"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-ink-500 hover:bg-ink-900/5 hover:text-ink-900"

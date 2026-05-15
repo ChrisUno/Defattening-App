@@ -40,3 +40,10 @@ coverage
 
 # Vite
 *.local
+
+# Server data
+server/data/
+server/node_modules/
+
+# Playwright
+.playwright-mcp/

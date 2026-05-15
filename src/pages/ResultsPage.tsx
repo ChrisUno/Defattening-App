@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { Crown, PartyPopper, ChevronLeft, HeartCrack } from 'lucide-react';
@@ -7,17 +7,19 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfettiBurst } from '../components/ConfettiBurst';
-import { useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { computeLeaderboard, formatPct } from '../lib/stats';
+import { api } from '../lib/api';
+import type { WeighIn } from '../types';
 
 const ResultsPage = () => {
   const navigate = useNavigate();
   const users = useDataStore((s) => s.users);
   const sessions = useDataStore((s) => s.sessions);
   const participations = useDataStore((s) => s.participations);
-  const weighIns = useDataStore((s) => s.weighIns);
-  const user = useCurrentUser(users);
+
+  const user = useAuthStore((s) => s.currentUser);
 
   const completed = useMemo(
     () => sessions.filter((s) => s.status === 'completed'),
@@ -26,13 +28,19 @@ const ResultsPage = () => {
 
   const [sessionId, setSessionId] = useState<string>(completed[0]?.id ?? '');
   const [confettiTick, setConfettiTick] = useState(1);
+  const [completedWeighIns, setCompletedWeighIns] = useState<WeighIn[]>([]);
 
   const session = completed.find((s) => s.id === sessionId) ?? completed[0];
 
+  useEffect(() => {
+    if (!session) return;
+    api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${session.id}`).then(setCompletedWeighIns).catch(() => {});
+  }, [session?.id]);
+
   const board = useMemo(() => {
     if (!session) return [];
-    return computeLeaderboard(session, users, participations, weighIns, session.weeks - 1);
-  }, [session, users, participations, weighIns]);
+    return computeLeaderboard(session, users, participations, completedWeighIns, session.weeks - 1);
+  }, [session, users, participations, completedWeighIns]);
 
   if (!session) {
     return (

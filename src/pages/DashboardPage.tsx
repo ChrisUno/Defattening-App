@@ -37,7 +37,7 @@ import { RivalCard } from '../components/RivalCard';
 import { PursuerCard } from '../components/PursuerCard';
 import { ActivityFeed } from '../components/ActivityFeed';
 import { BmiDialog } from '../components/BmiDialog';
-import { useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import {
   carryForwardWeights,
@@ -61,22 +61,22 @@ const DashboardPage = () => {
   const activityFeed = useDataStore((s) => s.activityFeed);
   const activeSessionId = useDataStore((s) => s.activeSessionId);
   const updateParticipation = useDataStore((s) => s.updateParticipation);
-  const user = useCurrentUser(users);
+  const user = useAuthStore((s) => s.currentUser);
 
   const [weighInOpen, setWeighInOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [bmiOpen, setBmiOpen] = useState(false);
   const [confettiTick, setConfettiTick] = useState(0);
 
-  const session = sessions.find((s) => s.id === activeSessionId)!;
-  const participation = participations.find(
+  const session = sessions.find((s) => s.id === activeSessionId);
+  const participation = session ? participations.find(
     (p) => p.userId === user?.id && p.sessionId === activeSessionId,
-  );
+  ) : undefined;
 
-  const weekIdx = currentWeekIndex(session);
+  const weekIdx = session ? currentWeekIndex(session) : 0;
 
   const leaderboard = useMemo(
-    () => computeLeaderboard(session, users, participations, weighIns, weekIdx),
+    () => session ? computeLeaderboard(session, users, participations, weighIns, weekIdx) : [],
     [session, users, participations, weighIns, weekIdx],
   );
 
@@ -91,6 +91,7 @@ const DashboardPage = () => {
   );
 
   const recentMovers = useMemo(() => {
+    if (!session) return new Set<string>();
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const moverIds = new Set<string>();
     for (const entry of activityFeed) {
@@ -99,7 +100,7 @@ const DashboardPage = () => {
       moverIds.add(entry.actorUserId);
     }
     return moverIds;
-  }, [activityFeed, session.id]);
+  }, [activityFeed, session?.id]);
 
   const myStats = useMemo(() => {
     if (!user || !participation) return null;
@@ -548,8 +549,8 @@ const DashboardPage = () => {
         onClose={() => setEditOpen(false)}
         startWeight={participation.startWeightKg}
         goalWeight={participation.goalWeightKg}
-        onSave={(s, g) => {
-          updateParticipation(participation.id, { startWeightKg: s, goalWeightKg: g });
+        onSave={async (s, g) => {
+          await updateParticipation(participation.id, { startWeightKg: s, goalWeightKg: g });
           setEditOpen(false);
         }}
       />

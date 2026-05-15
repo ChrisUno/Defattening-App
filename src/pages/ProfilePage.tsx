@@ -17,9 +17,11 @@ import { Badge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
+import { api } from '../lib/api';
+import type { WeighIn } from '../types';
 import {
   carryForwardWeights,
   computeLeaderboard,
@@ -37,8 +39,9 @@ const ProfilePage = () => {
   const journals = useDataStore((s) => s.journals);
   const updateUser = useDataStore((s) => s.updateUser);
   const pushToast = useUiStore((s) => s.pushToast);
-  const user = useCurrentUser(users);
+  const user = useAuthStore((s) => s.currentUser);
 
+  const [allWeighIns, setAllWeighIns] = useState<WeighIn[]>(weighIns);
   const [editingHeight, setEditingHeight] = useState(false);
   const [heightDraft, setHeightDraft] = useState('');
   const [heightError, setHeightError] = useState('');
@@ -46,6 +49,17 @@ const ProfilePage = () => {
   useEffect(() => {
     setHeightDraft(user?.heightCm?.toString() ?? '');
   }, [user?.heightCm]);
+
+  useEffect(() => {
+    if (!user) return;
+    const sessionIds = [...new Set(participations.filter(p => p.userId === user.id).map(p => p.sessionId))];
+    const activeId = useDataStore.getState().activeSessionId;
+    const otherIds = sessionIds.filter(id => id !== activeId);
+    if (otherIds.length === 0) { setAllWeighIns(weighIns); return; }
+    Promise.all(otherIds.map(id => api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${id}`)))
+      .then(results => setAllWeighIns([...weighIns, ...results.flat()]))
+      .catch(() => setAllWeighIns(weighIns));
+  }, [user?.id, participations, weighIns]);
 
   const myParts = useMemo(
     () => (user ? participations.filter((p) => p.userId === user.id) : []),
@@ -67,9 +81,9 @@ const ProfilePage = () => {
     const session = sessions.find((s) => s.id === active.sessionId);
     if (!session) return null;
     const week = currentWeekIndex(session);
-    const carry = carryForwardWeights(active, weighIns, week);
+    const carry = carryForwardWeights(active, allWeighIns, week);
     return carry[carry.length - 1] ?? active.startWeightKg;
-  }, [user, myParts, sessions, weighIns]);
+  }, [user, myParts, sessions, allWeighIns]);
 
   const currentBmi = useMemo<number | null>(() => {
     if (!user?.heightCm || currentWeightKg == null) return null;
@@ -85,7 +99,7 @@ const ProfilePage = () => {
       setHeightError('Height should be between 100 and 230 cm.');
       return;
     }
-    updateUser(user.id, { heightCm: Math.round(cm) });
+    updateUser(user.id, { heightCm: Math.round(cm) }).catch(() => {});
     setEditingHeight(false);
     setHeightError('');
     pushToast({ title: 'Height saved', variant: 'success' });
@@ -95,10 +109,10 @@ const ProfilePage = () => {
     .map((part) => {
       const session = sessions.find((s) => s.id === part.sessionId)!;
       const lastWeek = session.status === 'completed' ? session.weeks - 1 : currentWeekIndex(session);
-      const stats = computeParticipantStats(user, part, weighIns, lastWeek);
-      const board = computeLeaderboard(session, users, participations, weighIns, lastWeek);
+      const stats = computeParticipantStats(user, part, allWeighIns, lastWeek);
+      const board = computeLeaderboard(session, users, participations, allWeighIns, lastWeek);
       const rank = board.findIndex((b) => b.userId === user.id) + 1;
-      const totalLogged = weighIns.filter(
+      const totalLogged = allWeighIns.filter(
         (w) => w.userId === user.id && w.sessionId === session.id,
       ).length;
       return { session, part, stats, rank, total: board.length, totalLogged, lastWeek };

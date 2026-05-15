@@ -27,11 +27,15 @@ interface UiState {
   toasts: Toast[];
   seenBanners: Record<string, boolean>;
   theme: Theme;
+  globalLoading: boolean;
+  globalError: string | null;
   pushToast: (toast: Omit<Toast, 'id'>) => void;
   dismissToast: (id: string) => void;
   markBannerSeen: (key: string) => void;
   toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
+  setGlobalLoading: (loading: boolean) => void;
+  setGlobalError: (message: string | null) => void;
 }
 
 let counter = 0;
@@ -47,6 +51,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   toasts: [],
   seenBanners: {},
   theme: initialTheme,
+  globalLoading: false,
+  globalError: null,
   pushToast: (toast) =>
     set((s) => ({ toasts: [...s.toasts, { ...toast, id: uid() }] })),
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
@@ -62,4 +68,6 @@ export const useUiStore = create<UiState>((set, get) => ({
     applyThemeClass(theme);
     set({ theme });
   },
+  setGlobalLoading: (loading) => set({ globalLoading: loading }),
+  setGlobalError: (message) => set({ globalError: message }),
 }));

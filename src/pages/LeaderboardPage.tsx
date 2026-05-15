@@ -24,7 +24,7 @@ import { Card } from '../components/ui/Card';
 import { Avatar } from '../components/ui/Avatar';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
-import { useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import {
   computeLeaderboard,
@@ -54,11 +54,11 @@ const LeaderboardPage = () => {
   const weighIns = useDataStore((s) => s.weighIns);
   const activityFeed = useDataStore((s) => s.activityFeed);
   const activeSessionId = useDataStore((s) => s.activeSessionId);
-  const user = useCurrentUser(users);
+  const user = useAuthStore((s) => s.currentUser);
   const tokens = useChartTokens();
 
-  const session = sessions.find((s) => s.id === activeSessionId)!;
-  const weekIdx = currentWeekIndex(session);
+  const session = sessions.find((s) => s.id === activeSessionId);
+  const weekIdx = session ? currentWeekIndex(session) : 0;
 
   const [sortKey, setSortKey] = useState<SortKey>('cumulative');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
@@ -66,11 +66,12 @@ const LeaderboardPage = () => {
   const [filter, setFilter] = useState<FilterMode>('all');
 
   const board = useMemo(
-    () => computeLeaderboard(session, users, participations, weighIns, weekIdx),
+    () => session ? computeLeaderboard(session, users, participations, weighIns, weekIdx) : [],
     [session, users, participations, weighIns, weekIdx],
   );
 
   const recentMovers = useMemo(() => {
+    if (!session) return new Set<string>();
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const ids = new Set<string>();
     for (const entry of activityFeed) {
@@ -79,7 +80,7 @@ const LeaderboardPage = () => {
       ids.add(entry.actorUserId);
     }
     return ids;
-  }, [activityFeed, session.id]);
+  }, [activityFeed, session?.id]);
 
   const filtered = useMemo(() => {
     let rows = [...board];
@@ -116,7 +117,7 @@ const LeaderboardPage = () => {
   }, [board, query, filter, sortKey, sortDir, user]);
 
   const topUserId = board[0]?.userId;
-  const meStats = user
+  const meStats = user && session
     ? board.find((b) => b.userId === user.id) ??
       (participations.find((p) => p.userId === user.id && p.sessionId === session.id)
         ? computeParticipantStats(
@@ -129,6 +130,7 @@ const LeaderboardPage = () => {
     : null;
 
   const chartData = useMemo(() => {
+    if (!session) return { series: [], visible: [] };
     const visible = filtered.slice(0, 6);
     const series: { week: string; [userId: string]: number | string }[] = [];
     for (let w = 0; w <= weekIdx; w += 1) {
@@ -145,9 +147,9 @@ const LeaderboardPage = () => {
       series.push(row);
     }
     return { series, visible };
-  }, [filtered, weekIdx, participations, weighIns, session.id]);
+  }, [filtered, weekIdx, participations, weighIns, session?.id]);
 
-  if (!user) return null;
+  if (!user || !session) return null;
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {

@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -10,27 +11,20 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) => {
   const location = useLocation();
-  const userId = useAuthStore((s) => s.currentUserId);
-  const users = useDataStore((s) => s.users);
-  const participations = useDataStore((s) => s.participations);
-  const activeSessionId = useDataStore((s) => s.activeSessionId);
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const hasActiveParticipation = useAuthStore((s) => s.hasActiveParticipation);
+  const isHydrated = useDataStore((s) => s.isHydrated);
 
-  if (!userId) return <Navigate to="/" replace />;
+  if (!currentUser) return <Navigate to="/" replace />;
 
-  const user = users.find((u) => u.id === userId);
-  if (!user) return <Navigate to="/" replace />;
-
-  if (requireAdmin && user.role !== 'admin') {
+  if (requireAdmin && currentUser.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (user.role === 'user') {
-    const hasJoined = participations.some(
-      (p) => p.userId === userId && p.sessionId === activeSessionId,
-    );
-    if (!hasJoined && location.pathname !== '/onboarding') {
-      return <Navigate to="/onboarding" replace />;
-    }
+  if (!isHydrated) return <LoadingSpinner />;
+
+  if (currentUser.role === 'user' && !hasActiveParticipation && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <>{children}</>;

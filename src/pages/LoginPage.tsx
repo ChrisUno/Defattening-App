@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { Flame, ArrowRight, Sparkles, Trophy, Crown, Sun, Moon } from 'lucide-react';
@@ -10,51 +10,57 @@ import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
 
 const demoUsers = [
-  { label: 'Sign in as You (Alex)', email: 'you@unosquare.com' },
-  { label: 'Sign in as Admin (Sam)', email: 'admin@unosquare.com' },
+  { label: 'Sign in as Alex (User)', email: 'alex.morgan@unosquare.com', pw: 'password123' },
+  { label: 'Sign in as Admin (Sam)', email: 'admin@unosquare.com', pw: 'admin123' },
 ];
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const signIn = useAuthStore((s) => s.signIn);
-  const users = useDataStore((s) => s.users);
-  const participations = useDataStore((s) => s.participations);
-  const activeSessionId = useDataStore((s) => s.activeSessionId);
+  const currentUser = useAuthStore((s) => s.currentUser);
+  const hasActiveParticipation = useAuthStore((s) => s.hasActiveParticipation);
+  const hydrate = useDataStore((s) => s.hydrate);
+  const isHydrated = useDataStore((s) => s.isHydrated);
   const pushToast = useUiStore((s) => s.pushToast);
   const theme = useUiStore((s) => s.theme);
   const toggleTheme = useUiStore((s) => s.toggleTheme);
 
-  const [email, setEmail] = useState('you@unosquare.com');
-  const [password, setPassword] = useState('password');
-  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!currentUser || !isHydrated) return;
+    if (currentUser.role === 'admin') { navigate('/admin', { replace: true }); return; }
+    navigate(hasActiveParticipation ? '/dashboard' : '/onboarding', { replace: true });
+  }, [currentUser, isHydrated, hasActiveParticipation, navigate]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [email, setEmail] = useState('alex.morgan@unosquare.com');
+  const [password, setPassword] = useState('password123');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const user = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user || user.password !== password) {
-      setError('That combo doesn\'t look right. Try the demo logins below.');
-      return;
+    setLoading(true);
+    try {
+      await signIn(email, password);
+      await hydrate();
+      const { currentUser, hasActiveParticipation } = useAuthStore.getState();
+      pushToast({
+        title: `Welcome back, ${currentUser?.name.split(' ')[0]}!`,
+        description: 'Time to make this week count.',
+        variant: 'success',
+      });
+      if (currentUser?.role === 'admin') { navigate('/admin'); return; }
+      navigate(hasActiveParticipation ? '/dashboard' : '/onboarding');
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password.');
+    } finally {
+      setLoading(false);
     }
-    signIn(user.id);
-    pushToast({
-      title: `Welcome back, ${user.name.split(' ')[0]}!`,
-      description: 'Time to make this week count.',
-      variant: 'success',
-    });
-    if (user.role === 'admin') {
-      navigate('/admin');
-      return;
-    }
-    const joined = participations.some(
-      (p) => p.userId === user.id && p.sessionId === activeSessionId,
-    );
-    navigate(joined ? '/dashboard' : '/onboarding');
   };
 
-  const quickSignIn = (sampleEmail: string) => {
+  const quickSignIn = (sampleEmail: string, samplePw: string) => {
     setEmail(sampleEmail);
-    setPassword(sampleEmail.startsWith('admin') ? 'admin' : 'password');
+    setPassword(samplePw);
   };
 
   return (
@@ -170,8 +176,8 @@ const LoginPage = () => {
                   </div>
                 )}
 
-                <Button type="submit" size="lg" className="w-full" rightIcon={<ArrowRight size={18} />}>
-                  Let&apos;s go
+                <Button type="submit" size="lg" className="w-full" rightIcon={<ArrowRight size={18} />} disabled={loading}>
+                  {loading ? 'Signing in…' : "Let's go"}
                 </Button>
               </form>
 
@@ -183,7 +189,7 @@ const LoginPage = () => {
                   {demoUsers.map((d) => (
                     <button
                       key={d.email}
-                      onClick={() => quickSignIn(d.email)}
+                      onClick={() => quickSignIn(d.email, d.pw)}
                       type="button"
                       className="rounded-xl border-2 border-ink-900/10 bg-cream-100 px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:border-tangerine-300 hover:bg-tangerine-50"
                     >
@@ -192,8 +198,8 @@ const LoginPage = () => {
                   ))}
                 </div>
                 <p className="mt-3 text-[11px] text-ink-500">
-                  Password for users is <span className="font-mono font-bold">password</span>, admin is{' '}
-                  <span className="font-mono font-bold">admin</span>.
+                  Password for users is <span className="font-mono font-bold">password123</span>, admin is{' '}
+                  <span className="font-mono font-bold">admin123</span>.
                 </p>
               </div>
             </div>

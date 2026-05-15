@@ -1,0 +1,27 @@
+{
+  "name": "defattening-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "express-session": "^1.18.1",
+    "better-sqlite3": "^11.0.0",
+    "connect-sqlite3": "^0.9.15",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/express-session": "^1.18.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/connect-sqlite3": "^0.9.4"
+  }
+}

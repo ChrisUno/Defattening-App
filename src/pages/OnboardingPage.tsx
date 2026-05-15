@@ -7,17 +7,17 @@ import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { useAuthStore, useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
 
 const OnboardingPage = () => {
   const navigate = useNavigate();
-  const users = useDataStore((s) => s.users);
   const sessions = useDataStore((s) => s.sessions);
   const joinSession = useDataStore((s) => s.joinSession);
   const setActiveSession = useDataStore((s) => s.setActiveSession);
-  const user = useCurrentUser(users);
+  const user = useAuthStore((s) => s.currentUser);
+  const setHasActiveParticipation = useAuthStore((s) => s.setHasActiveParticipation);
   const pushToast = useUiStore((s) => s.pushToast);
   const signOut = useAuthStore((s) => s.signOut);
 
@@ -26,17 +26,19 @@ const OnboardingPage = () => {
     [sessions],
   );
 
-  const [selectedSession, setSelectedSession] = useState<string>(joinableSessions[0]?.id ?? '');
+  const defaultSession = joinableSessions.find((s) => s.status === 'active') ?? joinableSessions[0];
+  const [selectedSession, setSelectedSession] = useState<string>(defaultSession?.id ?? '');
   const [startWeight, setStartWeight] = useState('');
   const [goalWeight, setGoalWeight] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!user) {
     navigate('/');
     return null;
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     const sw = Number(startWeight);
@@ -54,19 +56,31 @@ const OnboardingPage = () => {
       return;
     }
 
-    joinSession({
-      userId: user.id,
-      sessionId: selectedSession,
-      startWeightKg: sw,
-      goalWeightKg: gw,
-    });
-    setActiveSession(selectedSession);
-    pushToast({
-      title: 'You\'re in! Let the (good kind of) games begin.',
-      description: 'We\'ll see you on the leaderboard.',
-      variant: 'celebrate',
-    });
-    navigate('/dashboard');
+    setLoading(true);
+    try {
+      await joinSession({
+        sessionId: selectedSession,
+        startWeightKg: sw,
+        goalWeightKg: gw,
+      });
+      setActiveSession(selectedSession);
+      setHasActiveParticipation(true);
+      pushToast({
+        title: 'You\'re in! Let the (good kind of) games begin.',
+        description: 'We\'ll see you on the leaderboard.',
+        variant: 'celebrate',
+      });
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Failed to join session.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
   };
 
   return (
@@ -193,16 +207,13 @@ const OnboardingPage = () => {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
             <button
               type="button"
-              onClick={() => {
-                signOut();
-                navigate('/');
-              }}
+              onClick={handleSignOut}
               className="text-sm font-semibold text-ink-500 hover:text-ink-900 self-start"
             >
               ← Sign out
             </button>
-            <Button type="submit" size="lg" rightIcon={<ArrowRight size={18} />}>
-              Join the challenge
+            <Button type="submit" size="lg" rightIcon={<ArrowRight size={18} />} disabled={loading}>
+              {loading ? 'Joining…' : 'Join the challenge'}
             </Button>
           </div>
         </form>

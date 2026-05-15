@@ -18,7 +18,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Dialog';
 import { Input, Label, Textarea } from '../components/ui/Input';
 import { Avatar } from '../components/ui/Avatar';
-import { useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
 import type { Session, User } from '../types';
@@ -47,7 +47,7 @@ const AdminPage = () => {
   const updateSession = useDataStore((s) => s.updateSession);
   const removeSession = useDataStore((s) => s.removeSession);
   const updateParticipation = useDataStore((s) => s.updateParticipation);
-  const currentAdmin = useCurrentUser(users);
+  const currentAdmin = useAuthStore((s) => s.currentUser);
   const pushToast = useUiStore((s) => s.pushToast);
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -68,27 +68,34 @@ const AdminPage = () => {
 
   if (!currentAdmin || currentAdmin.role !== 'admin') return null;
 
-  const handleInvite = (input: { name: string; email: string; password: string }) => {
-    const newUser = addUser({
-      name: input.name,
-      email: input.email,
-      password: input.password,
-      role: 'user',
-    });
-    pushToast({
-      title: `Invited ${newUser.name}`,
-      description: `Email sent to ${newUser.email} (pretend).`,
-      variant: 'success',
-    });
+  const handleInvite = async (input: { name: string; email: string; password: string }) => {
+    try {
+      const newUser = await addUser({
+        name: input.name,
+        email: input.email,
+        password: input.password,
+        role: 'user',
+      });
+      pushToast({
+        title: `Invited ${newUser.name}`,
+        description: `Email sent to ${newUser.email} (pretend).`,
+        variant: 'success',
+      });
+    } catch (err: any) {
+      pushToast({ title: err.message || 'Failed to invite user', variant: 'warning' });
+    }
   };
 
-  const handleCreateSession = (input: Omit<Session, 'id' | 'createdBy' | 'status'>) => {
-    createSession({
-      ...input,
-      createdBy: currentAdmin.id,
-      status: 'upcoming',
-    });
-    pushToast({ title: `Created ${input.name}`, variant: 'success' });
+  const handleCreateSession = async (input: Omit<Session, 'id' | 'createdBy' | 'status'>) => {
+    try {
+      await createSession({
+        ...input,
+        status: 'upcoming',
+      });
+      pushToast({ title: `Created ${input.name}`, variant: 'success' });
+    } catch (err: any) {
+      pushToast({ title: err.message || 'Failed to create session', variant: 'warning' });
+    }
   };
 
   return (
@@ -147,9 +154,9 @@ const AdminPage = () => {
                       <Pencil size={13} />
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (window.confirm(`Delete "${s.name}"? This removes all weigh-ins.`)) {
-                          removeSession(s.id);
+                          await removeSession(s.id);
                           pushToast({ title: 'Session deleted', variant: 'warning' });
                         }
                       }}
@@ -235,9 +242,9 @@ const AdminPage = () => {
                           <Pencil size={12} /> Edit
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (window.confirm(`Remove ${user.name}? This deletes all their data.`)) {
-                              removeUser(user.id);
+                              await removeUser(user.id);
                               pushToast({
                                 title: `${user.name} removed`,
                                 variant: 'warning',
@@ -274,12 +281,12 @@ const AdminPage = () => {
           setSessionOpen(false);
           setEditSession(null);
         }}
-        onSubmit={(input) => {
+        onSubmit={async (input) => {
           if (editSession) {
-            updateSession(editSession.id, input);
+            await updateSession(editSession.id, input);
             pushToast({ title: 'Session updated', variant: 'success' });
           } else {
-            handleCreateSession(input);
+            await handleCreateSession(input);
           }
           setSessionOpen(false);
           setEditSession(null);
@@ -289,12 +296,12 @@ const AdminPage = () => {
       <EditUserDialog
         user={editUser}
         onClose={() => setEditUser(null)}
-        onSave={(patch, partUpdates) => {
+        onSave={async (patch, partUpdates) => {
           if (!editUser) return;
-          updateUser(editUser.id, patch);
-          partUpdates.forEach(({ id, startWeightKg, goalWeightKg }) =>
-            updateParticipation(id, { startWeightKg, goalWeightKg }),
-          );
+          await updateUser(editUser.id, patch);
+          for (const { id, startWeightKg, goalWeightKg } of partUpdates) {
+            await updateParticipation(id, { startWeightKg, goalWeightKg });
+          }
           pushToast({ title: `${patch.name ?? editUser.name} updated`, variant: 'success' });
           setEditUser(null);
         }}

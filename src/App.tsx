@@ -1,4 +1,6 @@
+import { useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LoginPage from './pages/LoginPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
@@ -9,6 +11,41 @@ import ResultsPage from './pages/ResultsPage';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ToastViewport } from './components/ui/Toast';
+import { ErrorBanner } from './components/ErrorBanner';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { useAuthStore } from './store/authStore';
+import { useDataStore } from './store/dataStore';
+
+const queryClient = new QueryClient();
+
+function AppInitializer({ children }: { children: ReactNode }) {
+  const checkSession = useAuthStore((s) => s.checkSession);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isHydrated = useDataStore((s) => s.isHydrated);
+  const hydrate = useDataStore((s) => s.hydrate);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
+  useEffect(() => {
+    if (isAuthenticated && !isHydrated) {
+      hydrate();
+    }
+    if (!isAuthenticated && isHydrated) {
+      useDataStore.setState({
+        users: [], sessions: [], participations: [],
+        weighIns: [], journals: [], activityFeed: [],
+        activeSessionId: '', isHydrated: false,
+      });
+    }
+  }, [isAuthenticated, isHydrated, hydrate]);
+
+  if (isLoading) return <LoadingSpinner />;
+
+  return <>{children}</>;
+}
 
 interface AppProps {
   basename?: string;
@@ -16,71 +53,76 @@ interface AppProps {
 
 const App = ({ basename }: AppProps) => {
   return (
-    <BrowserRouter basename={basename}>
-      <Routes>
-        <Route path="/" element={<LoginPage />} />
-        <Route
-          path="/onboarding"
-          element={
-            <ProtectedRoute>
-              <OnboardingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <DashboardPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/leaderboard"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <LeaderboardPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ProfilePage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/results"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <ResultsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute requireAdmin>
-              <Layout>
-                <AdminPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <ToastViewport />
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter basename={basename}>
+        <AppInitializer>
+          <ErrorBanner />
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <OnboardingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DashboardPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/leaderboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <LeaderboardPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ProfilePage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/results"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <ResultsPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <Layout>
+                    <AdminPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <ToastViewport />
+        </AppInitializer>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 };
 

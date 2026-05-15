@@ -7,7 +7,7 @@ import { Input, Label, Textarea } from './ui/Input';
 import { Badge } from './ui/Badge';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
-import { useCurrentUser } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
 import {
   currentWeekIndex,
   userJournalForWeek,
@@ -33,7 +33,7 @@ export const WeighInModal = ({ open, onClose, onSuccess }: WeighInModalProps) =>
   const recordWeighIn = useDataStore((s) => s.recordWeighIn);
   const saveJournal = useDataStore((s) => s.saveJournal);
   const pushToast = useUiStore((s) => s.pushToast);
-  const user = useCurrentUser(users);
+  const user = useAuthStore((s) => s.currentUser);
 
   const session = sessions.find((s) => s.id === activeSessionId);
   const participation = participations.find(
@@ -45,6 +45,7 @@ export const WeighInModal = ({ open, onClose, onSuccess }: WeighInModalProps) =>
   const [measuredOn, setMeasuredOn] = useState(today());
   const [journal, setJournal] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const derivedWeekIdx = useMemo(() => {
     if (!session) return 0;
@@ -99,7 +100,7 @@ export const WeighInModal = ({ open, onClose, onSuccess }: WeighInModalProps) =>
   const minDate = format(sessionStart, 'yyyy-MM-dd');
   const maxDate = today();
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const kg = Number(weight);
     if (!kg || kg < 30 || kg > 300) {
@@ -130,60 +131,65 @@ export const WeighInModal = ({ open, onClose, onSuccess }: WeighInModalProps) =>
       bf = +parsed.toFixed(1);
     }
 
-    const result = recordWeighIn({
-      userId: user.id,
-      sessionId: session.id,
-      weightKg: +kg.toFixed(1),
-      bodyFatPct: bf,
-      weekIndex: derivedWeekIdx,
-      measuredAt: parseISO(measuredOn).toISOString(),
-    });
-
-    if (journal.trim()) {
-      saveJournal({
-        userId: user.id,
+    setSubmitting(true);
+    try {
+      const result = await recordWeighIn({
         sessionId: session.id,
+        weightKg: +kg.toFixed(1),
+        bodyFatPct: bf,
         weekIndex: derivedWeekIdx,
-        content: journal.trim(),
+        measuredAt: parseISO(measuredOn).toISOString(),
       });
-    }
 
-    const priorPoints = weeklyPointsFor(participation, weighIns, Math.max(derivedWeekIdx - 1, 0));
-    const lastKg = priorPoints[priorPoints.length - 1]?.weightKg ?? participation.startWeightKg;
-    const lost = lastKg - kg;
-    pushToast({
-      title:
-        lost > 0
-          ? `Down ${lost.toFixed(1)} kg this week!`
-          : lost < 0
-            ? `Up ${Math.abs(lost).toFixed(1)} kg — next week is yours.`
-            : 'Held steady this week.',
-      description: `Logged for week ${derivedWeekIdx + 1}. The leaderboard just got a refresh.`,
-      variant: lost > 0 ? 'celebrate' : 'default',
-    });
-
-    const usersMap = new Map(users.map((u) => [u.id, u]));
-    for (const evt of result.overtakes) {
-      const actor = usersMap.get(evt.actorUserId);
-      const target = usersMap.get(evt.targetUserId);
-      if (!actor || !target) continue;
-      if (evt.actorUserId === user.id) {
-        pushToast({
-          title: `You just passed ${target.name.split(' ')[0]}!`,
-          description: 'Recognition unlocked. Don\'t look back.',
-          variant: 'celebrate',
-        });
-      } else if (evt.targetUserId === user.id) {
-        pushToast({
-          title: `${actor.name.split(' ')[0]} just overtook you`,
-          description: 'They\'re right above you now — time to respond.',
-          variant: 'warning',
+      if (journal.trim()) {
+        await saveJournal({
+          sessionId: session.id,
+          weekIndex: derivedWeekIdx,
+          content: journal.trim(),
         });
       }
-    }
 
-    onSuccess?.(weighIns.length === 0 ? 'first' : 'weighin');
-    onClose();
+      const priorPoints = weeklyPointsFor(participation, weighIns, Math.max(derivedWeekIdx - 1, 0));
+      const lastKg = priorPoints[priorPoints.length - 1]?.weightKg ?? participation.startWeightKg;
+      const lost = lastKg - kg;
+      pushToast({
+        title:
+          lost > 0
+            ? `Down ${lost.toFixed(1)} kg this week!`
+            : lost < 0
+              ? `Up ${Math.abs(lost).toFixed(1)} kg — next week is yours.`
+              : 'Held steady this week.',
+        description: `Logged for week ${derivedWeekIdx + 1}. The leaderboard just got a refresh.`,
+        variant: lost > 0 ? 'celebrate' : 'default',
+      });
+
+      const usersMap = new Map(users.map((u) => [u.id, u]));
+      for (const evt of result.overtakes) {
+        const actor = usersMap.get(evt.actorUserId);
+        const target = usersMap.get(evt.targetUserId);
+        if (!actor || !target) continue;
+        if (evt.actorUserId === user.id) {
+          pushToast({
+            title: `You just passed ${target.name.split(' ')[0]}!`,
+            description: 'Recognition unlocked. Don\'t look back.',
+            variant: 'celebrate',
+          });
+        } else if (evt.targetUserId === user.id) {
+          pushToast({
+            title: `${actor.name.split(' ')[0]} just overtook you`,
+            description: 'They\'re right above you now — time to respond.',
+            variant: 'warning',
+          });
+        }
+      }
+
+      onSuccess?.(weighIns.length === 0 ? 'first' : 'weighin');
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Failed to save weigh-in. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -305,8 +311,8 @@ export const WeighInModal = ({ open, onClose, onSuccess }: WeighInModalProps) =>
           >
             Cancel
           </button>
-          <Button type="submit" size="lg" leftIcon={<Sparkles size={16} />}>
-            {existingForWeek ? 'Update log' : 'Log it'}
+          <Button type="submit" size="lg" leftIcon={<Sparkles size={16} />} disabled={submitting}>
+            {submitting ? 'Saving…' : existingForWeek ? 'Update log' : 'Log it'}
           </Button>
         </div>
       </form>
