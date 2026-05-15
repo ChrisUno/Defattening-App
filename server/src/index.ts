@@ -3,6 +3,7 @@ import cors from 'cors';
 import session from 'express-session';
 import connectSqlite3 from 'connect-sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 import { errorHandler } from './middleware/errorHandler.js';
@@ -16,14 +17,19 @@ import activityRoutes from './routes/activity.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SQLiteStore = connectSqlite3(session);
+const isProduction = process.env.NODE_ENV === 'production';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true,
-}));
+if (isProduction) {
+  app.set('trust proxy', 1);
+} else {
+  app.use(cors({
+    origin: 'http://localhost:5173',
+    credentials: true,
+  }));
+}
 
 app.use(express.json());
 
@@ -32,7 +38,7 @@ app.use(session({
     dir: path.join(__dirname, '..', 'data'),
     db: 'sessions.db',
   }),
-  secret: 'defattening-secret-key-change-in-prod',
+  secret: process.env.SESSION_SECRET || 'defattening-secret-key-change-in-prod',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -51,8 +57,16 @@ app.use('/api/weigh-ins', weighInRoutes);
 app.use('/api/journals', journalRoutes);
 app.use('/api/activity', activityRoutes);
 
+const distPath = path.join(__dirname, '..', '..', 'dist');
+if (isProduction && fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`Defattening API running on http://localhost:${PORT}`);
+  console.log(`Defattening server running on http://localhost:${PORT} (${isProduction ? 'production' : 'development'})`);
 });
