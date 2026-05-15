@@ -30,6 +30,8 @@ interface DataState {
   removeUser: (userId: string) => Promise<void>;
 
   joinSession: (input: { sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
+  adminJoinSession: (input: { userId: string; sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
+  removeParticipation: (id: string) => Promise<void>;
   updateParticipation: (id: string, patch: Partial<Participation>) => Promise<void>;
 
   recordWeighIn: (input: {
@@ -137,6 +139,32 @@ export const useDataStore = create<DataState>((set, get) => ({
       return { participations: [...s.participations, part] };
     });
     return part;
+  },
+
+  adminJoinSession: async (input) => {
+    const part = await api.post<Participation>('/api/participations/admin', input);
+    set((s) => {
+      const existing = s.participations.find(
+        (p) => p.userId === part.userId && p.sessionId === part.sessionId,
+      );
+      if (existing) {
+        return {
+          participations: s.participations.map((p) => (p.id === existing.id ? part : p)),
+        };
+      }
+      return { participations: [...s.participations, part] };
+    });
+    return part;
+  },
+
+  removeParticipation: async (id) => {
+    await api.delete(`/api/participations/${id}`);
+    const part = get().participations.find((p) => p.id === id);
+    set((s) => ({
+      participations: s.participations.filter((p) => p.id !== id),
+      weighIns: part ? s.weighIns.filter((w) => !(w.userId === part.userId && w.sessionId === part.sessionId)) : s.weighIns,
+      journals: part ? s.journals.filter((j) => !(j.userId === part.userId && j.sessionId === part.sessionId)) : s.journals,
+    }));
   },
 
   updateParticipation: async (id, patch) => {

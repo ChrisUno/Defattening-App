@@ -11,6 +11,9 @@ import {
   ChevronRight,
   Crown,
   X,
+  Users,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -21,7 +24,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
-import type { Session, User } from '../types';
+import type { Session, User, Participation } from '../types';
 import { cn } from '../lib/cn';
 import { addWeeks, formatISO } from 'date-fns';
 
@@ -47,6 +50,8 @@ const AdminPage = () => {
   const updateSession = useDataStore((s) => s.updateSession);
   const removeSession = useDataStore((s) => s.removeSession);
   const updateParticipation = useDataStore((s) => s.updateParticipation);
+  const adminJoinSession = useDataStore((s) => s.adminJoinSession);
+  const removeParticipation = useDataStore((s) => s.removeParticipation);
   const currentAdmin = useAuthStore((s) => s.currentUser);
   const pushToast = useUiStore((s) => s.pushToast);
 
@@ -291,6 +296,20 @@ const AdminPage = () => {
           setSessionOpen(false);
           setEditSession(null);
         }}
+        users={users}
+        participations={participations}
+        onAddParticipants={async (entries) => {
+          if (!editSession) return;
+          for (const entry of entries) {
+            await adminJoinSession({ ...entry, sessionId: editSession.id });
+          }
+          const names = entries.map((e) => users.find((u) => u.id === e.userId)?.name).filter(Boolean);
+          pushToast({ title: `Added ${names.join(', ')} to session`, variant: 'success' });
+        }}
+        onRemoveParticipant={async (participationId) => {
+          await removeParticipation(participationId);
+          pushToast({ title: 'Participant removed', variant: 'warning' });
+        }}
       />
 
       <EditUserDialog
@@ -385,9 +404,13 @@ interface SessionDialogProps {
   existing: Session | null;
   onClose: () => void;
   onSubmit: (input: Omit<Session, 'id' | 'createdBy' | 'status'> & { status?: Session['status'] }) => void;
+  users: User[];
+  participations: Participation[];
+  onAddParticipants: (entries: { userId: string; startWeightKg: number; goalWeightKg: number }[]) => Promise<void>;
+  onRemoveParticipant: (participationId: string) => Promise<void>;
 }
 
-const SessionDialog = ({ open, existing, onClose, onSubmit }: SessionDialogProps) => {
+const SessionDialog = ({ open, existing, onClose, onSubmit, users, participations, onAddParticipants, onRemoveParticipant }: SessionDialogProps) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [weeks, setWeeks] = useState('8');
@@ -396,6 +419,15 @@ const SessionDialog = ({ open, existing, onClose, onSubmit }: SessionDialogProps
   const [startDate, setStartDate] = useState(format(addWeeks(new Date(), 1), 'yyyy-MM-dd'));
   const [status, setStatus] = useState<Session['status']>('upcoming');
   const [error, setError] = useState('');
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [defaultWeight, setDefaultWeight] = useState('80');
+  const [defaultGoal, setDefaultGoal] = useState('75');
+  const [addingUsers, setAddingUsers] = useState(false);
+
+  const sessionParts = existing ? participations.filter((p) => p.sessionId === existing.id) : [];
+  const enrolledUserIds = new Set(sessionParts.map((p) => p.userId));
+  const availableUsers = users.filter((u) => u.role !== 'admin' && !enrolledUserIds.has(u.id));
 
   useEffect(() => {
     if (!open) return;
@@ -411,7 +443,44 @@ const SessionDialog = ({ open, existing, onClose, onSubmit }: SessionDialogProps
     );
     setStatus(existing?.status ?? 'upcoming');
     setError('');
+    setShowParticipants(false);
+    setSelectedUserIds(new Set());
+    setAddingUsers(false);
   }, [open, existing]);
+
+  const toggleUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const handleAddSelected = async () => {
+    if (selectedUserIds.size === 0 || !existing) return;
+    const sw = parseFloat(defaultWeight);
+    const gw = parseFloat(defaultGoal);
+    if (!sw || !gw || sw <= 0 || gw <= 0) {
+      setError('Enter valid start weight and goal weight for new participants.');
+      return;
+    }
+    setAddingUsers(true);
+    try {
+      const entries = Array.from(selectedUserIds).map((userId) => ({
+        userId,
+        startWeightKg: sw,
+        goalWeightKg: gw,
+      }));
+      await onAddParticipants(entries);
+      setSelectedUserIds(new Set());
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to add participants');
+    } finally {
+      setAddingUsers(false);
+    }
+  };
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -518,6 +587,136 @@ const SessionDialog = ({ open, existing, onClose, onSubmit }: SessionDialogProps
             </div>
           </div>
         )}
+
+        {existing && (
+          <div className="border-t-2 border-ink-900/10 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowParticipants(!showParticipants)}
+              className="flex items-center gap-2 text-sm font-bold text-ink-700 hover:text-ink-900 transition-colors"
+            >
+              <Users size={16} className="text-grape-500" />
+              Manage participants ({sessionParts.length})
+              <ChevronRight
+                size={14}
+                className={cn('transition-transform', showParticipants && 'rotate-90')}
+              />
+            </button>
+
+            {showParticipants && (
+              <div className="mt-3 space-y-3">
+                {sessionParts.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500">Current participants</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border-2 border-ink-900/10 bg-cream-100 p-2">
+                      {sessionParts.map((p) => {
+                        const u = users.find((u) => u.id === p.userId);
+                        if (!u) return null;
+                        return (
+                          <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-cream-50 px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar name={u.name} color={u.avatarColor} size="xs" />
+                              <span className="text-sm font-medium text-ink-900">{u.name}</span>
+                              <span className="text-xs text-ink-500">{p.startWeightKg}kg → {p.goalWeightKg}kg</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (window.confirm(`Remove ${u.name} from this session? Their weigh-ins and journals will be deleted.`)) {
+                                  await onRemoveParticipant(p.id);
+                                }
+                              }}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-bright/10 text-rose-bright hover:bg-rose-bright/20"
+                              title={`Remove ${u.name}`}
+                            >
+                              <Minus size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {availableUsers.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500">Add participants</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border-2 border-ink-900/10 bg-cream-100 p-2">
+                      {availableUsers.map((u) => (
+                        <label
+                          key={u.id}
+                          className={cn(
+                            'flex items-center gap-2 rounded-xl px-3 py-2 cursor-pointer transition-colors',
+                            selectedUserIds.has(u.id)
+                              ? 'bg-grape-100 border-2 border-grape-300'
+                              : 'bg-cream-50 border-2 border-transparent hover:bg-ink-900/5',
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedUserIds.has(u.id)}
+                            onChange={() => toggleUser(u.id)}
+                            className="rounded border-ink-900/20 text-grape-500 focus:ring-grape-300"
+                          />
+                          <Avatar name={u.name} color={u.avatarColor} size="xs" />
+                          <span className="text-sm font-medium text-ink-900">{u.name}</span>
+                          <span className="text-xs text-ink-400">{u.email}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {selectedUserIds.size > 0 && (
+                      <div className="rounded-xl border-2 border-grape-200 bg-grape-50 p-3 space-y-2">
+                        <p className="text-xs font-bold text-grape-700">
+                          Adding {selectedUserIds.size} user{selectedUserIds.size > 1 ? 's' : ''} — set default weights:
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label>Start weight (kg)</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="30"
+                              max="300"
+                              value={defaultWeight}
+                              onChange={(e) => setDefaultWeight(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Goal weight (kg)</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="30"
+                              max="300"
+                              value={defaultGoal}
+                              onChange={(e) => setDefaultGoal(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleAddSelected}
+                          disabled={addingUsers}
+                          leftIcon={<Plus size={14} />}
+                        >
+                          {addingUsers ? 'Adding…' : `Add ${selectedUserIds.size} to session`}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {availableUsers.length === 0 && sessionParts.length > 0 && (
+                  <p className="text-xs text-ink-400 italic">All users are already in this session.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {error && <p className="text-sm text-rose-bright font-medium">{error}</p>}
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>
