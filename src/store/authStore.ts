@@ -57,9 +57,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signInWithEntra: async () => {
-    const { msalInstance, loginRequest } = await import('../lib/msalConfig');
-    await msalInstance.initialize();
-    const result = await msalInstance.loginPopup(loginRequest);
+    const { getMsalInstance, loginRequest } = await import('../lib/msalConfig');
+    const msal = await getMsalInstance();
+    const result = await msal.loginPopup(loginRequest);
     const data = await api.postWithBearer<AuthResponse>('/api/auth/entra', result.accessToken);
     set({
       currentUser: data.user,
@@ -74,10 +74,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       await api.post('/api/auth/logout');
     } catch {}
     try {
-      const { msalInstance } = await import('../lib/msalConfig');
-      await msalInstance.initialize();
-      const account = msalInstance.getActiveAccount();
-      if (account) await msalInstance.logoutPopup({ account });
+      const { getMsalInstance } = await import('../lib/msalConfig');
+      const msal = await getMsalInstance();
+      const account = msal.getActiveAccount();
+      if (account) await msal.logoutPopup({ account });
     } catch {}
     set({
       currentUser: null,
