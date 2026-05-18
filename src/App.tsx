@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import LoginPage from './pages/LoginPage';
@@ -24,14 +24,16 @@ function AppInitializer({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isHydrated = useDataStore((s) => s.isHydrated);
   const hydrate = useDataStore((s) => s.hydrate);
+  const hydratingRef = useRef(false);
 
   useEffect(() => {
     checkSession();
   }, [checkSession]);
 
   useEffect(() => {
-    if (isAuthenticated && !isHydrated) {
-      hydrate();
+    if (isAuthenticated && !isHydrated && !hydratingRef.current) {
+      hydratingRef.current = true;
+      hydrate().finally(() => { hydratingRef.current = false; });
     }
     if (!isAuthenticated && isHydrated) {
       useDataStore.setState({

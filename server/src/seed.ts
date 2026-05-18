@@ -1,3 +1,13 @@
+const env = process.env.NODE_ENV;
+if (env !== 'development') {
+  console.error(
+    `❌ Seed script refused to run — NODE_ENV is "${env ?? 'undefined'}".` +
+    `\n   This script is only allowed when NODE_ENV=development.` +
+    `\n   Aborting with zero database changes.`
+  );
+  process.exit(1);
+}
+
 import pool from './db.js';
 import bcrypt from 'bcryptjs';
 

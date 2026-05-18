@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Link } from 'react-router';
 import { motion } from 'framer-motion';
 import {
   Scale,
@@ -123,7 +123,24 @@ const DashboardPage = () => {
   }, [user, session, weekIdx, journals]);
 
   if (!user) return null;
-  if (!participation || !myStats) return <Navigate to="/onboarding" replace />;
+  if (!participation || !myStats) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 text-center">
+        <Card className="max-w-md mx-auto py-10">
+          <Scale size={32} className="mx-auto text-ink-400 mb-4" />
+          <h2 className="font-display text-2xl font-bold mb-2">Not in this session yet</h2>
+          <p className="text-sm text-ink-500 mb-6">
+            You haven't joined the current session. Head to onboarding to get started.
+          </p>
+          <Link to="/onboarding">
+            <Button size="lg" rightIcon={<ArrowRight size={18} />}>
+              Join the challenge
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
 
   const hasEnoughDataForBoard = weighIns.filter((w) => w.sessionId === session.id).length >= 4;
   const topUserId = leaderboard[0]?.userId;

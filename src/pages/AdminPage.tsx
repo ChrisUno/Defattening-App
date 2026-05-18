@@ -421,8 +421,7 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
   const [error, setError] = useState('');
   const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
-  const [defaultWeight, setDefaultWeight] = useState('80');
-  const [defaultGoal, setDefaultGoal] = useState('75');
+  const [userWeights, setUserWeights] = useState<Record<string, { start: string; goal: string }>>({});
   const [addingUsers, setAddingUsers] = useState(false);
 
   const sessionParts = existing ? participations.filter((p) => p.sessionId === existing.id) : [];
@@ -445,6 +444,7 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
     setError('');
     setShowAddDropdown(false);
     setSelectedUserIds(new Set());
+    setUserWeights({});
     setAddingUsers(false);
   }, [open, existing]);
 
@@ -455,25 +455,33 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
       else next.add(userId);
       return next;
     });
+    setUserWeights((prev) => {
+      if (prev[userId]) return prev;
+      return { ...prev, [userId]: { start: '80', goal: '75' } };
+    });
   };
 
   const handleAddSelected = async () => {
     if (selectedUserIds.size === 0 || !existing) return;
-    const sw = parseFloat(defaultWeight);
-    const gw = parseFloat(defaultGoal);
-    if (!sw || !gw || sw <= 0 || gw <= 0) {
-      setError('Enter valid start weight and goal weight for new participants.');
-      return;
+
+    const entries: { userId: string; startWeightKg: number; goalWeightKg: number }[] = [];
+    for (const userId of selectedUserIds) {
+      const w = userWeights[userId] ?? { start: '80', goal: '75' };
+      const sw = parseFloat(w.start);
+      const gw = parseFloat(w.goal);
+      if (!sw || !gw || sw <= 0 || gw <= 0) {
+        const user = users.find((u) => u.id === userId);
+        setError(`Enter valid weights for ${user?.name ?? 'user'}.`);
+        return;
+      }
+      entries.push({ userId, startWeightKg: sw, goalWeightKg: gw });
     }
+
     setAddingUsers(true);
     try {
-      const entries = Array.from(selectedUserIds).map((userId) => ({
-        userId,
-        startWeightKg: sw,
-        goalWeightKg: gw,
-      }));
       await onAddParticipants(entries);
       setSelectedUserIds(new Set());
+      setUserWeights({});
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to add participants');
@@ -648,68 +656,77 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
             {showAddDropdown && availableUsers.length > 0 && (
               <div className="rounded-xl border-2 border-grape-200 bg-grape-50 p-3 space-y-3">
                 <p className="text-[11px] uppercase tracking-wider font-bold text-grape-700">Select users to add</p>
-                <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border-2 border-grape-200 bg-cream-50 p-2">
-                  {availableUsers.map((u) => (
-                    <label
-                      key={u.id}
-                      className={cn(
-                        'flex items-center gap-2 rounded-xl px-3 py-2 cursor-pointer transition-colors',
-                        selectedUserIds.has(u.id)
-                          ? 'bg-grape-100'
-                          : 'hover:bg-ink-900/5',
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.has(u.id)}
-                        onChange={() => toggleUser(u.id)}
-                        className="rounded border-ink-900/20 text-grape-500 focus:ring-grape-300"
-                      />
-                      <Avatar name={u.name} color={u.avatarColor} size="xs" />
-                      <span className="text-sm font-medium text-ink-900">{u.name}</span>
-                      <span className="text-xs text-ink-400 truncate">{u.email}</span>
-                    </label>
-                  ))}
+                <div className="max-h-64 overflow-y-auto space-y-1 rounded-xl border-2 border-grape-200 bg-cream-50 p-2">
+                  {availableUsers.map((u) => {
+                    const isSelected = selectedUserIds.has(u.id);
+                    const weights = userWeights[u.id] ?? { start: '80', goal: '75' };
+                    return (
+                      <div key={u.id} className="space-y-1">
+                        <label
+                          className={cn(
+                            'flex items-center gap-2 rounded-xl px-3 py-2 cursor-pointer transition-colors',
+                            isSelected ? 'bg-grape-100' : 'hover:bg-ink-900/5',
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleUser(u.id)}
+                            className="rounded border-ink-900/20 text-grape-500 focus:ring-grape-300"
+                          />
+                          <Avatar name={u.name} color={u.avatarColor} size="xs" />
+                          <span className="text-sm font-medium text-ink-900">{u.name}</span>
+                          <span className="text-xs text-ink-400 truncate">{u.email}</span>
+                        </label>
+                        {isSelected && (
+                          <div className="grid grid-cols-2 gap-2 pl-8 pb-1">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="30"
+                              max="300"
+                              value={weights.start}
+                              onChange={(e) =>
+                                setUserWeights((prev) => ({
+                                  ...prev,
+                                  [u.id]: { ...prev[u.id], start: e.target.value },
+                                }))
+                              }
+                              suffix="kg start"
+                            />
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="30"
+                              max="300"
+                              value={weights.goal}
+                              onChange={(e) =>
+                                setUserWeights((prev) => ({
+                                  ...prev,
+                                  [u.id]: { ...prev[u.id], goal: e.target.value },
+                                }))
+                              }
+                              suffix="kg goal"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {selectedUserIds.size > 0 && (
-                  <>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label>Start weight (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="30"
-                          max="300"
-                          value={defaultWeight}
-                          onChange={(e) => setDefaultWeight(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label>Goal weight (kg)</Label>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="30"
-                          max="300"
-                          value={defaultGoal}
-                          onChange={(e) => setDefaultGoal(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleAddSelected}
-                      disabled={addingUsers}
-                      leftIcon={<Plus size={14} />}
-                      className="w-full"
-                    >
-                      {addingUsers ? 'Adding…' : `Add ${selectedUserIds.size} user${selectedUserIds.size > 1 ? 's' : ''} to session`}
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAddSelected}
+                    disabled={addingUsers}
+                    leftIcon={<Plus size={14} />}
+                    className="w-full"
+                  >
+                    {addingUsers ? 'Adding…' : `Add ${selectedUserIds.size} user${selectedUserIds.size > 1 ? 's' : ''} to session`}
+                  </Button>
                 )}
 
                 {selectedUserIds.size === 0 && (

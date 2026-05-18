@@ -46,6 +46,8 @@ interface DataState {
   removeSession: (id: string) => Promise<void>;
 }
 
+let hydrateInFlight: Promise<void> | null = null;
+
 export const useDataStore = create<DataState>((set, get) => ({
   users: [],
   sessions: [],
@@ -62,30 +64,40 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   hydrate: async (sessionId?) => {
-    const [users, sessions, participations] = await Promise.all([
-      api.get<User[]>('/api/users'),
-      api.get<Session[]>('/api/sessions'),
-      api.get<Participation[]>('/api/participations'),
-    ]);
+    if (hydrateInFlight) return hydrateInFlight;
 
-    const active = sessionId
-      || sessions.find((s) => s.status === 'active')?.id
-      || sessions[0]?.id
-      || '';
+    hydrateInFlight = (async () => {
+      try {
+        const [users, sessions, participations] = await Promise.all([
+          api.get<User[]>('/api/users'),
+          api.get<Session[]>('/api/sessions'),
+          api.get<Participation[]>('/api/participations'),
+        ]);
 
-    let weighIns: WeighIn[] = [];
-    let journals: JournalEntry[] = [];
-    let activityFeed: ActivityEntry[] = [];
+        const active = sessionId
+          || sessions.find((s) => s.status === 'active')?.id
+          || sessions[0]?.id
+          || '';
 
-    if (active) {
-      [weighIns, journals, activityFeed] = await Promise.all([
-        api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${active}`),
-        api.get<JournalEntry[]>(`/api/journals?sessionId=${active}`),
-        api.get<ActivityEntry[]>(`/api/activity?sessionId=${active}`),
-      ]);
-    }
+        let weighIns: WeighIn[] = [];
+        let journals: JournalEntry[] = [];
+        let activityFeed: ActivityEntry[] = [];
 
-    set({ users, sessions, participations, weighIns, journals, activityFeed, activeSessionId: active, isHydrated: true });
+        if (active) {
+          [weighIns, journals, activityFeed] = await Promise.all([
+            api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${active}`),
+            api.get<JournalEntry[]>(`/api/journals?sessionId=${active}`),
+            api.get<ActivityEntry[]>(`/api/activity?sessionId=${active}`),
+          ]);
+        }
+
+        set({ users, sessions, participations, weighIns, journals, activityFeed, activeSessionId: active, isHydrated: true });
+      } finally {
+        hydrateInFlight = null;
+      }
+    })();
+
+    return hydrateInFlight;
   },
 
   hydrateSessionData: async (sessionId) => {

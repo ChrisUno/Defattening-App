@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { CalendarDays, Target, Scale, Sparkles, ArrowRight, Users } from 'lucide-react';
@@ -21,10 +21,26 @@ const OnboardingPage = () => {
   const pushToast = useUiStore((s) => s.pushToast);
   const signOut = useAuthStore((s) => s.signOut);
 
+  const participations = useDataStore((s) => s.participations);
+
   const joinableSessions = useMemo(
     () => sessions.filter((s) => s.status !== 'completed'),
     [sessions],
   );
+
+  const alreadyJoined = useMemo(
+    () => joinableSessions.some((s) =>
+      participations.some((p) => p.userId === user?.id && p.sessionId === s.id)
+    ),
+    [joinableSessions, participations, user],
+  );
+
+  useEffect(() => {
+    if (alreadyJoined) {
+      setHasActiveParticipation(true);
+      navigate('/dashboard', { replace: true });
+    }
+  }, [alreadyJoined, navigate, setHasActiveParticipation]);
 
   const defaultSession = joinableSessions.find((s) => s.status === 'active') ?? joinableSessions[0];
   const [selectedSession, setSelectedSession] = useState<string>(defaultSession?.id ?? '');

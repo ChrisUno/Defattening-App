@@ -36,10 +36,10 @@ const LoginPage = () => {
   const toggleTheme = useUiStore((s) => s.toggleTheme);
 
   useEffect(() => {
-    if (!currentUser || !isHydrated) return;
-    if (!hasActiveParticipation) { navigate('/onboarding', { replace: true }); return; }
-    navigate('/dashboard', { replace: true });
-  }, [currentUser, isHydrated, hasActiveParticipation, navigate]);
+    if (currentUser && isHydrated) {
+      navigate(hasActiveParticipation ? '/dashboard' : '/onboarding', { replace: true });
+    }
+  }, []);
 
   const [email, setEmail] = useState('alex.morgan@unosquare.com');
   const [password, setPassword] = useState('password123');
