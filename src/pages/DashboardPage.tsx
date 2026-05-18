@@ -15,6 +15,9 @@ import {
   Sparkles,
   NotebookPen,
   Activity,
+  Dumbbell,
+  Target,
+  Zap,
 } from 'lucide-react';
 import {
   format,
@@ -51,6 +54,7 @@ import {
   userHasWeighedInThisWeek,
   userJournalForWeek,
 } from '../lib/stats';
+import { getWeightComparison, getSessionWeightComparison, getWeeksToGoal } from '../lib/weightComparisons';
 
 const DashboardPage = () => {
   const users = useDataStore((s) => s.users);
@@ -155,6 +159,28 @@ const DashboardPage = () => {
   const totalLostKg = participation.startWeightKg - currentWeight;
   const goalDeltaKg = currentWeight - participation.goalWeightKg;
   const currentBodyFat = latestBodyFatPct(user.id, session.id, weighIns);
+
+  const sessionTotalLostKg = useMemo(() => {
+    return leaderboard.reduce((sum, stat) => {
+      const lost = stat.startWeightKg - (stat.currentWeightKg ?? stat.startWeightKg);
+      return sum + Math.max(0, lost);
+    }, 0);
+  }, [leaderboard]);
+
+  const myComparison = useMemo(
+    () => totalLostKg > 0 ? getWeightComparison(totalLostKg) : null,
+    [totalLostKg],
+  );
+
+  const sessionComparison = useMemo(
+    () => sessionTotalLostKg > 0 ? getSessionWeightComparison(sessionTotalLostKg) : null,
+    [sessionTotalLostKg],
+  );
+
+  const weeksToGoal = useMemo(
+    () => getWeeksToGoal(currentWeight, participation.goalWeightKg, totalLostKg, weekIdx + 1),
+    [currentWeight, participation.goalWeightKg, totalLostKg, weekIdx],
+  );
 
   const handleWeighInSuccess = () => {
     setConfettiTick((t) => t + 1);
@@ -520,6 +546,104 @@ const DashboardPage = () => {
           </Card>
         )}
       </section>
+
+      {hasEnoughDataForBoard && (totalLostKg > 0 || sessionTotalLostKg > 0) && (
+        <section>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {myComparison && totalLostKg > 0 && (
+              <Card className="relative overflow-hidden">
+                <div className="absolute -top-2 -right-2 text-6xl opacity-15 select-none">
+                  {myComparison.emoji}
+                </div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-lime-300/30 text-lime-700">
+                      <Dumbbell size={16} />
+                    </span>
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-ink-500">
+                      You shed
+                    </p>
+                  </div>
+                  <p className="font-display text-2xl font-bold text-ink-900">
+                    {totalLostKg.toFixed(1)} kg
+                  </p>
+                  <p className="text-sm text-ink-700 mt-1">
+                    That&apos;s roughly <span className="font-bold text-lime-700">{myComparison.label}</span>
+                    {' '}{myComparison.emoji}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            {sessionComparison && sessionTotalLostKg > 0 && (
+              <Card className="relative overflow-hidden">
+                <div className="absolute -top-2 -right-2 text-6xl opacity-15 select-none">
+                  {sessionComparison.emoji}
+                </div>
+                <div className="relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-grape-100 text-grape-700">
+                      <Zap size={16} />
+                    </span>
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-ink-500">
+                      The team shed
+                    </p>
+                  </div>
+                  <p className="font-display text-2xl font-bold text-ink-900">
+                    {sessionTotalLostKg.toFixed(1)} kg
+                  </p>
+                  <p className="text-sm text-ink-700 mt-1">
+                    That&apos;s roughly <span className="font-bold text-grape-700">{sessionComparison.label}</span>
+                    {' '}{sessionComparison.emoji}
+                  </p>
+                </div>
+              </Card>
+            )}
+
+            <Card className="relative overflow-hidden" tone={weeksToGoal === 0 ? 'lime' : 'default'}>
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-tangerine-50 text-tangerine-700">
+                    <Target size={16} />
+                  </span>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-ink-500">
+                    Goal ETA
+                  </p>
+                </div>
+                {weeksToGoal === null ? (
+                  <>
+                    <p className="font-display text-2xl font-bold text-ink-900">&mdash;</p>
+                    <p className="text-sm text-ink-500 mt-1">
+                      Start losing to see your countdown
+                    </p>
+                  </>
+                ) : weeksToGoal === 0 ? (
+                  <>
+                    <p className="font-display text-2xl font-bold text-lime-700">
+                      Goal reached! 🎉
+                    </p>
+                    <p className="text-sm text-ink-700 mt-1">
+                      You hit your goal weight &mdash; keep crushing it
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display text-2xl font-bold text-ink-900 tabular-nums">
+                      ~{weeksToGoal} week{weeksToGoal !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-sm text-ink-500 mt-1">
+                      At your avg of {(totalLostKg / (weekIdx + 1)).toFixed(2)} kg/wk
+                    </p>
+                    <p className="text-xs text-ink-400 mt-0.5">
+                      {goalDeltaKg.toFixed(1)} kg remaining
+                    </p>
+                  </>
+                )}
+              </div>
+            </Card>
+          </div>
+        </section>
+      )}
 
       {hasEnoughDataForBoard && (
         <section>
