@@ -28,8 +28,9 @@ export const Layout = ({ children }: LayoutProps) => {
   const isAdmin = user.role === 'admin';
   const links = isAdmin
     ? [
-        { to: '/admin', label: 'Admin', icon: Shield },
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+        { to: '/admin', label: 'Admin', icon: Shield },
         { to: '/profile', label: 'Profile', icon: UserCircle2 },
       ]
     : navLinks;
@@ -44,7 +45,7 @@ export const Layout = ({ children }: LayoutProps) => {
       <header className="sticky top-0 z-30 border-b-2 border-ink-900/10 bg-cream-50/85 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-3 flex items-center gap-4">
           <button
-            onClick={() => navigate(isAdmin ? '/admin' : '/dashboard')}
+            onClick={() => navigate('/dashboard')}
             className="flex items-center gap-2 group"
             aria-label="Home"
           >

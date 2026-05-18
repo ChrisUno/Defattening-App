@@ -123,8 +123,7 @@ const DashboardPage = () => {
   }, [user, session, weekIdx, journals]);
 
   if (!user) return null;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
-  if (!participation || !myStats) return null;
+  if (!participation || !myStats) return <Navigate to="/onboarding" replace />;
 
   const hasEnoughDataForBoard = weighIns.filter((w) => w.sessionId === session.id).length >= 4;
   const topUserId = leaderboard[0]?.userId;

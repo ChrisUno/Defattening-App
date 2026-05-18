@@ -427,7 +427,7 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
 
   const sessionParts = existing ? participations.filter((p) => p.sessionId === existing.id) : [];
   const enrolledUserIds = new Set(sessionParts.map((p) => p.userId));
-  const availableUsers = users.filter((u) => u.role !== 'admin' && !enrolledUserIds.has(u.id));
+  const availableUsers = users.filter((u) => !enrolledUserIds.has(u.id));
 
   useEffect(() => {
     if (!open) return;

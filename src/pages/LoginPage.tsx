@@ -37,8 +37,8 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (!currentUser || !isHydrated) return;
-    if (currentUser.role === 'admin') { navigate('/admin', { replace: true }); return; }
-    navigate(hasActiveParticipation ? '/dashboard' : '/onboarding', { replace: true });
+    if (!hasActiveParticipation) { navigate('/onboarding', { replace: true }); return; }
+    navigate('/dashboard', { replace: true });
   }, [currentUser, isHydrated, hasActiveParticipation, navigate]);
 
   const [email, setEmail] = useState('alex.morgan@unosquare.com');
@@ -49,8 +49,7 @@ const LoginPage = () => {
   const [devExpanded, setDevExpanded] = useState(import.meta.env.DEV);
 
   const navigateAfterLogin = () => {
-    const { currentUser, hasActiveParticipation } = useAuthStore.getState();
-    if (currentUser?.role === 'admin') { navigate('/admin'); return; }
+    const { hasActiveParticipation } = useAuthStore.getState();
     navigate(hasActiveParticipation ? '/dashboard' : '/onboarding');
   };
 
