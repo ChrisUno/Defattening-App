@@ -119,4 +119,19 @@ describe('requireAdmin', () => {
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('DB query throws → error propagates (no try/catch in middleware)', async () => {
+    const req = mockReq({ userId: 'u1' });
+    const res = mockRes();
+    const next = vi.fn();
+    const dbError = new Error('connection refused');
+
+    (pool.query as any).mockRejectedValue(dbError);
+
+    // requireAdmin has no try/catch — the rejection propagates.
+    // In production, Express catches this only if wrapped in asyncHandler.
+    await expect(requireAdmin(req, res, next)).rejects.toThrow('connection refused');
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
 });

@@ -99,6 +99,14 @@ describe('carryForwardWeights', () => {
 // ─── weeklyPointsFor ─────────────────────────────────────────────────
 
 describe('weeklyPointsFor', () => {
+  it('week 0 → delta is 0, pctFromStart is 0', () => {
+    const points = weeklyPointsFor(participations[0], weighIns, 0);
+    expect(points).toHaveLength(1);
+    // week 0: prev = start = 100, w = 100 → delta = 0, pctFromStart = 0
+    expect(points[0].delta).toBe(0);
+    expect(points[0].pctFromStart).toBe(0);
+  });
+
   it('3 weeks of steady loss → pctFromStart increases, positive deltas', () => {
     const points = weeklyPointsFor(participations[0], weighIns, 3);
     expect(points).toHaveLength(4); // weeks 0-3
@@ -167,7 +175,9 @@ describe('computeParticipantStats', () => {
     expect(stats.currentWeightKg).toBe(97);
     expect(stats.startWeightKg).toBe(100);
     expect(stats.weeksLogged).toBe(4);
-    expect(stats.bestWeekLoss).toBeGreaterThan(0);
+    // bestWeekLoss = max delta across weeks 1-3
+    // week 1: (100-99)/100=1.0, week 2: (99-98)/99≈1.0101, week 3: (98-97)/98≈1.0204
+    expect(stats.bestWeekLoss).toBeCloseTo(1.0204, 2);
   });
 
   it('user with no weigh-ins → cumulativePct=0, currentWeightKg=startWeight', () => {
@@ -205,9 +215,8 @@ describe('computeLeaderboard', () => {
 // ─── findRival ───────────────────────────────────────────────────────
 
 describe('findRival', () => {
-  const board = computeLeaderboard(session, users, participations, weighIns, 3);
-
   it('user in 2nd place → returns 1st place as rival', () => {
+    const board = computeLeaderboard(session, users, participations, weighIns, 3);
     const sorted = [...board].sort((a, b) => b.cumulativePct - a.cumulativePct);
     const secondPlace = sorted[1];
     const result = findRival(board, secondPlace.userId);
@@ -219,11 +228,13 @@ describe('findRival', () => {
   });
 
   it('user in 1st place → returns null', () => {
+    const board = computeLeaderboard(session, users, participations, weighIns, 3);
     const sorted = [...board].sort((a, b) => b.cumulativePct - a.cumulativePct);
     expect(findRival(board, sorted[0].userId)).toBeNull();
   });
 
   it('user not in board → returns null', () => {
+    const board = computeLeaderboard(session, users, participations, weighIns, 3);
     expect(findRival(board, 'u-nonexistent')).toBeNull();
   });
 });
@@ -231,9 +242,8 @@ describe('findRival', () => {
 // ─── findPursuer ─────────────────────────────────────────────────────
 
 describe('findPursuer', () => {
-  const board = computeLeaderboard(session, users, participations, weighIns, 3);
-
   it('user in 1st place → returns 2nd place as pursuer', () => {
+    const board = computeLeaderboard(session, users, participations, weighIns, 3);
     const sorted = [...board].sort((a, b) => b.cumulativePct - a.cumulativePct);
     const first = sorted[0];
     const result = findPursuer(board, first.userId);
@@ -244,9 +254,15 @@ describe('findPursuer', () => {
   });
 
   it('user in last place → returns null', () => {
+    const board = computeLeaderboard(session, users, participations, weighIns, 3);
     const sorted = [...board].sort((a, b) => b.cumulativePct - a.cumulativePct);
     const last = sorted[sorted.length - 1];
     expect(findPursuer(board, last.userId)).toBeNull();
+  });
+
+  it('user not in board → returns null', () => {
+    const board = computeLeaderboard(session, users, participations, weighIns, 3);
+    expect(findPursuer(board, 'u-nonexistent')).toBeNull();
   });
 });
 

@@ -146,6 +146,18 @@ describe('averageWeeklyLossKg', () => {
     const weighIns = [mkWeighIn(0, 100)];
     expect(averageWeeklyLossKg(part, weighIns, 2)).toBeNull();
   });
+
+  it('gaining user → returns negative rate', () => {
+    const part = mkParticipation({ startWeightKg: 90 });
+    const weighIns = [
+      mkWeighIn(0, 90),
+      mkWeighIn(1, 91),
+      mkWeighIn(2, 92),
+    ];
+    // (90 - 92) / 2 = -1.0 kg/week (gaining)
+    const rate = averageWeeklyLossKg(part, weighIns, 2);
+    expect(rate).toBeCloseTo(-1.0, 5);
+  });
 });
 
 // ─── projectToHealthyBmi ─────────────────────────────────────────────

@@ -31,6 +31,18 @@ describe('getWeightComparison', () => {
     // |1.7 - 1.5| = 0.2 vs |1.7 - 2.0| = 0.3
     expect(result.label).toBe('a pineapple');
   });
+
+  it('0 kg → stick of butter (closest to 0.2)', () => {
+    const result = getWeightComparison(0);
+    // |0 - 0.2| = 0.2 (butter) vs |0 - 0.5| = 0.5 (bread)
+    expect(result.label).toBe('a stick of butter');
+  });
+
+  it('negative weight → stick of butter (closest to 0.2)', () => {
+    const result = getWeightComparison(-1);
+    // |-1 - 0.2| = 1.2 is still closest to butter
+    expect(result.label).toBe('a stick of butter');
+  });
 });
 
 // ─── getSessionWeightComparison (session table) ──────────────────────
