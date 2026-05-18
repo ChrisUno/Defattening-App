@@ -52,18 +52,18 @@ export const Dialog = ({ open, onClose, title, description, children, maxWidth =
             exit={{ opacity: 0, y: 32, scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
             className={cn(
-              'relative z-10 w-full rounded-[28px] border-2 border-ink-900/10 bg-cream-50 shadow-2xl',
+              'relative z-10 w-full rounded-[28px] border-2 border-ink-900/10 bg-cream-50 shadow-2xl max-h-[90vh] flex flex-col',
               widthClasses[maxWidth],
             )}
           >
             <button
               onClick={onClose}
               aria-label="Close"
-              className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full bg-ink-900/5 text-ink-700 hover:bg-ink-900/10"
+              className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-ink-900/5 text-ink-700 hover:bg-ink-900/10"
             >
               <X size={18} />
             </button>
-            <div className="px-6 pt-7 pb-6 sm:px-8 sm:pt-8 sm:pb-8">
+            <div className="px-6 pt-7 pb-6 sm:px-8 sm:pt-8 sm:pb-8 overflow-y-auto">
               {title && (
                 <h2 className="text-2xl font-display font-semibold text-ink-900 pr-10">{title}</h2>
               )}
