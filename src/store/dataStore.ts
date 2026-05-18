@@ -10,6 +10,13 @@ import type {
   WeighIn,
 } from '../types';
 
+export interface WeighInStatus {
+  sessionId: string;
+  weekIndex: number;
+  hasWeighedIn: boolean;
+  weighInDayOfWeek: number;
+}
+
 interface DataState {
   users: User[];
   sessions: Session[];
@@ -17,6 +24,7 @@ interface DataState {
   weighIns: WeighIn[];
   journals: JournalEntry[];
   activityFeed: ActivityEntry[];
+  weighInStatuses: WeighInStatus[];
   activeSessionId: string;
   isHydrated: boolean;
 
@@ -55,6 +63,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   weighIns: [],
   journals: [],
   activityFeed: [],
+  weighInStatuses: [],
   activeSessionId: '',
   isHydrated: false,
 
@@ -91,7 +100,12 @@ export const useDataStore = create<DataState>((set, get) => ({
           ]);
         }
 
-        set({ users, sessions, participations, weighIns, journals, activityFeed, activeSessionId: active, isHydrated: true });
+        let weighInStatuses: WeighInStatus[] = [];
+        try {
+          weighInStatuses = await api.get<WeighInStatus[]>('/api/weigh-ins/status');
+        } catch { /* non-critical */ }
+
+        set({ users, sessions, participations, weighIns, journals, activityFeed, weighInStatuses, activeSessionId: active, isHydrated: true });
       } finally {
         hydrateInFlight = null;
       }
@@ -202,7 +216,13 @@ export const useDataStore = create<DataState>((set, get) => ({
         nextActivity = [...result.overtakes, ...s.activityFeed].slice(0, 40);
       }
 
-      return { weighIns: nextWeighIns, activityFeed: nextActivity };
+      const nextStatuses = s.weighInStatuses.map((st) =>
+        st.sessionId === result.weighIn.sessionId && st.weekIndex === result.weighIn.weekIndex
+          ? { ...st, hasWeighedIn: true }
+          : st,
+      );
+
+      return { weighIns: nextWeighIns, activityFeed: nextActivity, weighInStatuses: nextStatuses };
     });
 
     return result;

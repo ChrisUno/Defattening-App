@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useUiStore } from '../store/uiStore';
 import { Avatar } from './ui/Avatar';
 import { cn } from '../lib/cn';
+import { WeighInReminder } from './WeighInReminder';
 
 interface LayoutProps {
   children: ReactNode;
@@ -115,6 +116,8 @@ export const Layout = ({ children }: LayoutProps) => {
           </nav>
         </div>
       </header>
+
+      <WeighInReminder />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-8 md:py-12">{children}</main>
 

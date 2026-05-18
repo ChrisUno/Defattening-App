@@ -39,6 +39,7 @@ function AppInitializer({ children }: { children: ReactNode }) {
       useDataStore.setState({
         users: [], sessions: [], participations: [],
         weighIns: [], journals: [], activityFeed: [],
+        weighInStatuses: [],
         activeSessionId: '', isHydrated: false,
       });
     }

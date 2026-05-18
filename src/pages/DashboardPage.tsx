@@ -40,6 +40,8 @@ import { RivalCard } from '../components/RivalCard';
 import { PursuerCard } from '../components/PursuerCard';
 import { ActivityFeed } from '../components/ActivityFeed';
 import { BmiDialog } from '../components/BmiDialog';
+import { SessionPicker } from '../components/SessionPicker';
+import { JoinSessionDialog } from '../components/JoinSessionDialog';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import {
@@ -70,7 +72,15 @@ const DashboardPage = () => {
   const [weighInOpen, setWeighInOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [bmiOpen, setBmiOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [confettiTick, setConfettiTick] = useState(0);
+
+  // Listen for WeighInReminder "Log it now" clicks
+  useEffect(() => {
+    const handler = () => setWeighInOpen(true);
+    window.addEventListener('open-weigh-in', handler);
+    return () => window.removeEventListener('open-weigh-in', handler);
+  }, []);
 
   const session = sessions.find((s) => s.id === activeSessionId);
   const participation = session ? participations.find(
@@ -126,39 +136,29 @@ const DashboardPage = () => {
     return userJournalForWeek(user.id, session.id, weekIdx, journals);
   }, [user, session, weekIdx, journals]);
 
-  if (!user) return null;
-  if (!participation || !myStats) {
-    return (
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-12 text-center">
-        <Card className="max-w-md mx-auto py-10">
-          <Scale size={32} className="mx-auto text-ink-400 mb-4" />
-          <h2 className="font-display text-2xl font-bold mb-2">Not in this session yet</h2>
-          <p className="text-sm text-ink-500 mb-6">
-            You haven't joined the current session. Head to onboarding to get started.
-          </p>
-          <Link to="/onboarding">
-            <Button size="lg" rightIcon={<ArrowRight size={18} />}>
-              Join the challenge
-            </Button>
-          </Link>
-        </Card>
-      </div>
-    );
-  }
+  // Check if user has any participations at all
+  const hasAnyParticipation = user
+    ? participations.some((p) => p.userId === user.id)
+    : false;
 
-  const hasEnoughDataForBoard = weighIns.filter((w) => w.sessionId === session.id).length >= 4;
+  if (!user) return null;
+
+  const needsJoin = !hasAnyParticipation || !session || !participation || !myStats;
+
+  // Below values only valid when needsJoin is false
+  const hasEnoughDataForBoard = !needsJoin && weighIns.filter((w) => w.sessionId === session.id).length >= 4;
   const topUserId = leaderboard[0]?.userId;
   const myRank = leaderboard.findIndex((p) => p.userId === user.id) + 1;
   const today = startOfDay(new Date());
-  const daysUntilWeighIn = (session.weighInDayOfWeek - today.getDay() + 7) % 7;
+  const daysUntilWeighIn = session ? (session.weighInDayOfWeek - today.getDay() + 7) % 7 : 0;
   const nextWeighInDate = addDays(today, daysUntilWeighIn);
   const daysAway = differenceInCalendarDays(nextWeighInDate, today);
 
-  const weights = carryForwardWeights(participation, weighIns, weekIdx);
-  const currentWeight = weights[weights.length - 1] ?? participation.startWeightKg;
-  const totalLostKg = participation.startWeightKg - currentWeight;
-  const goalDeltaKg = currentWeight - participation.goalWeightKg;
-  const currentBodyFat = latestBodyFatPct(user.id, session.id, weighIns);
+  const weights = !needsJoin ? carryForwardWeights(participation, weighIns, weekIdx) : [];
+  const currentWeight = !needsJoin ? (weights[weights.length - 1] ?? participation.startWeightKg) : 0;
+  const totalLostKg = !needsJoin ? participation.startWeightKg - currentWeight : 0;
+  const goalDeltaKg = !needsJoin ? currentWeight - participation.goalWeightKg : 0;
+  const currentBodyFat = !needsJoin ? latestBodyFatPct(user.id, session.id, weighIns) : null;
 
   const sessionTotalLostKg = useMemo(() => {
     return leaderboard.reduce((sum, stat) => {
@@ -178,8 +178,8 @@ const DashboardPage = () => {
   );
 
   const weeksToGoal = useMemo(
-    () => getWeeksToGoal(currentWeight, participation.goalWeightKg, totalLostKg, weekIdx + 1),
-    [currentWeight, participation.goalWeightKg, totalLostKg, weekIdx],
+    () => !needsJoin ? getWeeksToGoal(currentWeight, participation.goalWeightKg, totalLostKg, weekIdx + 1) : null,
+    [needsJoin, currentWeight, participation?.goalWeightKg, totalLostKg, weekIdx],
   );
 
   const handleWeighInSuccess = () => {
@@ -196,6 +196,33 @@ const DashboardPage = () => {
   return (
     <div className="space-y-8">
       <ConfettiBurst trigger={confettiTick} />
+
+      {hasAnyParticipation && <SessionPicker />}
+
+      {needsJoin ? (
+        <div className="text-center py-8">
+          <Card className="max-w-md mx-auto py-10">
+            <Scale size={32} className="mx-auto text-ink-400 mb-4" />
+            <h2 className="font-display text-2xl font-bold mb-2">
+              {!hasAnyParticipation
+                ? 'Join a session to get started'
+                : 'Not in this session yet'}
+            </h2>
+            <p className="text-sm text-ink-500 mb-6">
+              {!hasAnyParticipation
+                ? 'Pick a session, step on the scale, and start losing it loud.'
+                : "Switch to a session you've joined above, or join this one."}
+            </p>
+            <Button
+              size="lg"
+              rightIcon={<ArrowRight size={18} />}
+              onClick={() => setJoinOpen(true)}
+            >
+              {!hasAnyParticipation ? 'Join a session' : 'Join this session'}
+            </Button>
+          </Card>
+        </div>
+      ) : (<>
 
       <section>
         <div
@@ -700,11 +727,15 @@ const DashboardPage = () => {
         onClose={() => setBmiOpen(false)}
         user={user}
         currentWeightKg={currentWeight}
-        participation={participation}
+        participation={participation!}
         weighIns={weighIns}
         weekIndex={weekIdx}
-        sessionStartDate={session.startDate}
+        sessionStartDate={session!.startDate}
       />
+
+      </>)}
+
+      <JoinSessionDialog open={joinOpen} onClose={() => setJoinOpen(false)} />
     </div>
   );
 };

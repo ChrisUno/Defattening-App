@@ -4,6 +4,13 @@ import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { computeLeaderboard, computeRanksForSession, currentWeekIndex } from '../lib/stats.js';
 
+interface WeighInStatus {
+  sessionId: string;
+  weekIndex: number;
+  hasWeighedIn: boolean;
+  weighInDayOfWeek: number;
+}
+
 const router = Router();
 
 const toWeighIn = (row: any) => ({
@@ -56,6 +63,41 @@ const getLeaderboardData = async (sessionId: string) => {
     })),
   };
 };
+
+// Multi-session weigh-in status — returns per-session status for current user
+router.get('/status', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.session.userId!;
+
+  const { rows } = await pool.query(
+    `SELECT s.id AS session_id, s.start_date, s.weeks, s.weigh_in_day_of_week
+     FROM participations p
+     JOIN sessions s ON s.id = p.session_id
+     WHERE p.user_id = $1 AND s.status IN ('active', 'upcoming')`,
+    [userId],
+  );
+
+  const statuses: WeighInStatus[] = [];
+
+  for (const r of rows) {
+    const weekIdx = currentWeekIndex({ id: r.session_id, startDate: r.start_date, weeks: r.weeks });
+
+    const { rows: wiRows } = await pool.query(
+      `SELECT 1 FROM weigh_ins
+       WHERE user_id = $1 AND session_id = $2 AND week_index = $3
+       LIMIT 1`,
+      [userId, r.session_id, weekIdx],
+    );
+
+    statuses.push({
+      sessionId: r.session_id,
+      weekIndex: weekIdx,
+      hasWeighedIn: wiRows.length > 0,
+      weighInDayOfWeek: r.weigh_in_day_of_week,
+    });
+  }
+
+  res.json(statuses);
+}));
 
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId } = req.query;
