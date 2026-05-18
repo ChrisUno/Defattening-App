@@ -46,7 +46,7 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [entraLoading, setEntraLoading] = useState(false);
-  const [devExpanded, setDevExpanded] = useState(import.meta.env.DEV);
+  const [devExpanded, setDevExpanded] = useState(true);
 
   const navigateAfterLogin = () => {
     const { hasActiveParticipation } = useAuthStore.getState();
@@ -95,9 +95,26 @@ const LoginPage = () => {
     }
   };
 
-  const quickSignIn = (sampleEmail: string, samplePw: string) => {
+  const quickSignIn = async (sampleEmail: string, samplePw: string) => {
     setEmail(sampleEmail);
     setPassword(samplePw);
+    setError('');
+    setLoading(true);
+    try {
+      await signIn(sampleEmail, samplePw);
+      await hydrate();
+      const { currentUser } = useAuthStore.getState();
+      pushToast({
+        title: `Welcome back, ${currentUser?.name.split(' ')[0]}!`,
+        description: 'Time to make this week count.',
+        variant: 'success',
+      });
+      navigateAfterLogin();
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
