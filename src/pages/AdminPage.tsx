@@ -419,7 +419,7 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
   const [startDate, setStartDate] = useState(format(addWeeks(new Date(), 1), 'yyyy-MM-dd'));
   const [status, setStatus] = useState<Session['status']>('upcoming');
   const [error, setError] = useState('');
-  const [showParticipants, setShowParticipants] = useState(false);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [defaultWeight, setDefaultWeight] = useState('80');
   const [defaultGoal, setDefaultGoal] = useState('75');
@@ -443,7 +443,7 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
     );
     setStatus(existing?.status ?? 'upcoming');
     setError('');
-    setShowParticipants(false);
+    setShowAddDropdown(false);
     setSelectedUserIds(new Set());
     setAddingUsers(false);
   }, [open, existing]);
@@ -589,130 +589,137 @@ const SessionDialog = ({ open, existing, onClose, onSubmit, users, participation
         )}
 
         {existing && (
-          <div className="border-t-2 border-ink-900/10 pt-4">
-            <button
-              type="button"
-              onClick={() => setShowParticipants(!showParticipants)}
-              className="flex items-center gap-2 text-sm font-bold text-ink-700 hover:text-ink-900 transition-colors"
-            >
-              <Users size={16} className="text-grape-500" />
-              Manage participants ({sessionParts.length})
-              <ChevronRight
-                size={14}
-                className={cn('transition-transform', showParticipants && 'rotate-90')}
-              />
-            </button>
+          <div className="border-t-2 border-ink-900/10 pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-grape-500" />
+                <span className="text-sm font-bold text-ink-900">Participants ({sessionParts.length})</span>
+              </div>
+              {availableUsers.length > 0 && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowAddDropdown(!showAddDropdown)}
+                  leftIcon={<Plus size={14} />}
+                >
+                  Add users
+                </Button>
+              )}
+            </div>
 
-            {showParticipants && (
-              <div className="mt-3 space-y-3">
-                {sessionParts.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500">Current participants</p>
-                    <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border-2 border-ink-900/10 bg-cream-100 p-2">
-                      {sessionParts.map((p) => {
-                        const u = users.find((u) => u.id === p.userId);
-                        if (!u) return null;
-                        return (
-                          <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-cream-50 px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <Avatar name={u.name} color={u.avatarColor} size="xs" />
-                              <span className="text-sm font-medium text-ink-900">{u.name}</span>
-                              <span className="text-xs text-ink-500">{p.startWeightKg}kg → {p.goalWeightKg}kg</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (window.confirm(`Remove ${u.name} from this session? Their weigh-ins and journals will be deleted.`)) {
-                                  await onRemoveParticipant(p.id);
-                                }
-                              }}
-                              className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-bright/10 text-rose-bright hover:bg-rose-bright/20"
-                              title={`Remove ${u.name}`}
-                            >
-                              <Minus size={12} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {availableUsers.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500">Add participants</p>
-                    <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border-2 border-ink-900/10 bg-cream-100 p-2">
-                      {availableUsers.map((u) => (
-                        <label
-                          key={u.id}
-                          className={cn(
-                            'flex items-center gap-2 rounded-xl px-3 py-2 cursor-pointer transition-colors',
-                            selectedUserIds.has(u.id)
-                              ? 'bg-grape-100 border-2 border-grape-300'
-                              : 'bg-cream-50 border-2 border-transparent hover:bg-ink-900/5',
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedUserIds.has(u.id)}
-                            onChange={() => toggleUser(u.id)}
-                            className="rounded border-ink-900/20 text-grape-500 focus:ring-grape-300"
-                          />
-                          <Avatar name={u.name} color={u.avatarColor} size="xs" />
-                          <span className="text-sm font-medium text-ink-900">{u.name}</span>
-                          <span className="text-xs text-ink-400">{u.email}</span>
-                        </label>
-                      ))}
-                    </div>
-
-                    {selectedUserIds.size > 0 && (
-                      <div className="rounded-xl border-2 border-grape-200 bg-grape-50 p-3 space-y-2">
-                        <p className="text-xs font-bold text-grape-700">
-                          Adding {selectedUserIds.size} user{selectedUserIds.size > 1 ? 's' : ''} — set default weights:
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label>Start weight (kg)</Label>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="30"
-                              max="300"
-                              value={defaultWeight}
-                              onChange={(e) => setDefaultWeight(e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <Label>Goal weight (kg)</Label>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="30"
-                              max="300"
-                              value={defaultGoal}
-                              onChange={(e) => setDefaultGoal(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={handleAddSelected}
-                          disabled={addingUsers}
-                          leftIcon={<Plus size={14} />}
-                        >
-                          {addingUsers ? 'Adding…' : `Add ${selectedUserIds.size} to session`}
-                        </Button>
+            {sessionParts.length > 0 && (
+              <div className="max-h-48 overflow-y-auto space-y-1 rounded-xl border-2 border-ink-900/10 bg-cream-100 p-2">
+                {sessionParts.map((p) => {
+                  const u = users.find((u) => u.id === p.userId);
+                  if (!u) return null;
+                  return (
+                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-cream-50 px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar name={u.name} color={u.avatarColor} size="xs" />
+                        <span className="text-sm font-medium text-ink-900 truncate">{u.name}</span>
+                        <span className="text-xs text-ink-500 shrink-0">{p.startWeightKg}kg → {p.goalWeightKg}kg</span>
                       </div>
-                    )}
-                  </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (window.confirm(`Remove ${u.name} from this session? Their weigh-ins and journals will be deleted.`)) {
+                            await onRemoveParticipant(p.id);
+                          }
+                        }}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-rose-bright/10 text-rose-bright hover:bg-rose-bright/20 shrink-0"
+                        title={`Remove ${u.name}`}
+                      >
+                        <Minus size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {sessionParts.length === 0 && !showAddDropdown && (
+              <div className="rounded-xl border-2 border-dashed border-ink-900/15 bg-cream-100 px-4 py-6 text-center">
+                <p className="text-sm text-ink-500">No participants yet.</p>
+                <p className="text-xs text-ink-400 mt-1">Click “Add users” to enrol people in this session.</p>
+              </div>
+            )}
+
+            {showAddDropdown && availableUsers.length > 0 && (
+              <div className="rounded-xl border-2 border-grape-200 bg-grape-50 p-3 space-y-3">
+                <p className="text-[11px] uppercase tracking-wider font-bold text-grape-700">Select users to add</p>
+                <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border-2 border-grape-200 bg-cream-50 p-2">
+                  {availableUsers.map((u) => (
+                    <label
+                      key={u.id}
+                      className={cn(
+                        'flex items-center gap-2 rounded-xl px-3 py-2 cursor-pointer transition-colors',
+                        selectedUserIds.has(u.id)
+                          ? 'bg-grape-100'
+                          : 'hover:bg-ink-900/5',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.has(u.id)}
+                        onChange={() => toggleUser(u.id)}
+                        className="rounded border-ink-900/20 text-grape-500 focus:ring-grape-300"
+                      />
+                      <Avatar name={u.name} color={u.avatarColor} size="xs" />
+                      <span className="text-sm font-medium text-ink-900">{u.name}</span>
+                      <span className="text-xs text-ink-400 truncate">{u.email}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {selectedUserIds.size > 0 && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>Start weight (kg)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="30"
+                          max="300"
+                          value={defaultWeight}
+                          onChange={(e) => setDefaultWeight(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label>Goal weight (kg)</Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="30"
+                          max="300"
+                          value={defaultGoal}
+                          onChange={(e) => setDefaultGoal(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleAddSelected}
+                      disabled={addingUsers}
+                      leftIcon={<Plus size={14} />}
+                      className="w-full"
+                    >
+                      {addingUsers ? 'Adding…' : `Add ${selectedUserIds.size} user${selectedUserIds.size > 1 ? 's' : ''} to session`}
+                    </Button>
+                  </>
                 )}
 
-                {availableUsers.length === 0 && sessionParts.length > 0 && (
-                  <p className="text-xs text-ink-400 italic">All users are already in this session.</p>
+                {selectedUserIds.size === 0 && (
+                  <p className="text-xs text-grape-600">Tick the users you want to add, then set their starting weights.</p>
                 )}
               </div>
+            )}
+
+            {showAddDropdown && availableUsers.length === 0 && (
+              <p className="text-xs text-ink-400 italic">All users are already in this session.</p>
             )}
           </div>
         )}
