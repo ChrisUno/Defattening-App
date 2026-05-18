@@ -23,7 +23,7 @@ export const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) 
 
   if (!isHydrated) return <LoadingSpinner />;
 
-  if (currentUser.role === 'user' && !hasActiveParticipation && location.pathname !== '/onboarding') {
+  if (!hasActiveParticipation && location.pathname !== '/onboarding' && location.pathname !== '/admin') {
     return <Navigate to="/onboarding" replace />;
   }
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = Router();
 
@@ -13,15 +14,15 @@ const toPart = (row: any) => ({
   joinedAt: row.joined_at,
 });
 
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId } = req.query;
   const { rows } = sessionId
     ? await pool.query('SELECT * FROM participations WHERE session_id = $1', [sessionId])
     : await pool.query('SELECT * FROM participations');
   res.json(rows.map(toPart));
-});
+}));
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.session.userId!;
   const { sessionId, startWeightKg, goalWeightKg } = req.body;
   if (!sessionId || !startWeightKg || !goalWeightKg) {
@@ -50,9 +51,9 @@ router.post('/', requireAuth, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
   res.status(201).json(toPart(rows[0]));
-});
+}));
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { rows: existing } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
   if (existing.length === 0) {
@@ -78,9 +79,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
   res.json(toPart(rows[0]));
-});
+}));
 
-router.post('/admin', requireAdmin, async (req, res) => {
+router.post('/admin', requireAdmin, asyncHandler(async (req, res) => {
   const { userId, sessionId, startWeightKg, goalWeightKg } = req.body;
   if (!userId || !sessionId || !startWeightKg || !goalWeightKg) {
     res.status(400).json({ message: 'userId, sessionId, startWeightKg, and goalWeightKg are required' });
@@ -114,9 +115,9 @@ router.post('/admin', requireAdmin, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
   res.status(201).json(toPart(rows[0]));
-});
+}));
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { rows } = await pool.query('SELECT id FROM participations WHERE id = $1', [id]);
   if (rows.length === 0) {
@@ -127,6 +128,6 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   await pool.query('DELETE FROM journals WHERE user_id = (SELECT user_id FROM participations WHERE id = $1) AND session_id = (SELECT session_id FROM participations WHERE id = $1)', [id]);
   await pool.query('DELETE FROM participations WHERE id = $1', [id]);
   res.json({ ok: true });
-});
+}));
 
 export default router;

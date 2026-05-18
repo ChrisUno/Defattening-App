@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = Router();
 
@@ -16,12 +17,12 @@ const toSession = (row: any) => ({
   createdBy: row.created_by,
 });
 
-router.get('/', requireAuth, async (_req, res) => {
+router.get('/', requireAuth, asyncHandler(async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM sessions ORDER BY start_date DESC');
   res.json(rows.map(toSession));
-});
+}));
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const { name, description, weeks, weighInDayOfWeek, weighInNote, startDate, status } = req.body;
   if (!name || !weeks || !startDate) {
     res.status(400).json({ message: 'Name, weeks, and start date are required' });
@@ -38,9 +39,9 @@ router.post('/', requireAdmin, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM sessions WHERE id = $1', [id]);
   res.status(201).json(toSession(rows[0]));
-});
+}));
 
-router.patch('/:id', requireAdmin, async (req, res) => {
+router.patch('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { rows: existing } = await pool.query('SELECT id FROM sessions WHERE id = $1', [id]);
   if (existing.length === 0) {
@@ -71,9 +72,9 @@ router.patch('/:id', requireAdmin, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM sessions WHERE id = $1', [id]);
   res.json(toSession(rows[0]));
-});
+}));
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { rows } = await pool.query('SELECT id FROM sessions WHERE id = $1', [id]);
   if (rows.length === 0) {
@@ -87,6 +88,6 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   await pool.query('DELETE FROM participations WHERE session_id = $1', [id]);
   await pool.query('DELETE FROM sessions WHERE id = $1', [id]);
   res.json({ ok: true });
-});
+}));
 
 export default router;

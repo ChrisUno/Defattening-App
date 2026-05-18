@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import pool from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = Router();
 
@@ -18,12 +19,12 @@ const toUser = (row: any) => ({
 const AVATAR_COLORS = ['#2563EB', '#1D4ED8', '#0EA5E9', '#0284C7', '#06B6D4', '#0891B2', '#3B82F6', '#6366F1', '#4F46E5', '#7C3AED', '#8B5CF6', '#0F766E', '#14B8A6'];
 const pickColor = () => AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 
-router.get('/', requireAuth, async (_req, res) => {
+router.get('/', requireAuth, asyncHandler(async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM users ORDER BY created_at');
   res.json(rows.map(toUser));
-});
+}));
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', requireAdmin, asyncHandler(async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email) {
     res.status(400).json({ message: 'Name and email are required' });
@@ -46,9 +47,9 @@ router.post('/', requireAdmin, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
   res.status(201).json(toUser(rows[0]));
-});
+}));
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = req.session.userId!;
 
@@ -86,9 +87,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
   res.json(toUser(rows[0]));
-});
+}));
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { rows } = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
   if (rows.length === 0) {
@@ -97,6 +98,6 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
   await pool.query('DELETE FROM users WHERE id = $1', [id]);
   res.json({ ok: true });
-});
+}));
 
 export default router;

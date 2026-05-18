@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 import { computeLeaderboard, computeRanksForSession, currentWeekIndex } from '../lib/stats.js';
 
 const router = Router();
@@ -56,7 +57,7 @@ const getLeaderboardData = async (sessionId: string) => {
   };
 };
 
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId } = req.query;
   if (!sessionId) {
     res.status(400).json({ message: 'sessionId query param is required' });
@@ -64,9 +65,9 @@ router.get('/', requireAuth, async (req, res) => {
   }
   const { rows } = await pool.query('SELECT * FROM weigh_ins WHERE session_id = $1 ORDER BY week_index', [sessionId]);
   res.json(rows.map(toWeighIn));
-});
+}));
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.session.userId!;
   const { sessionId, weightKg, bodyFatPct, weekIndex, measuredAt } = req.body;
 
@@ -142,6 +143,6 @@ router.post('/', requireAuth, async (req, res) => {
 
   const { rows: wiRows } = await pool.query('SELECT * FROM weigh_ins WHERE id = $1', [weighInId]);
   res.json({ weighIn: toWeighIn(wiRows[0]), overtakes });
-});
+}));
 
 export default router;

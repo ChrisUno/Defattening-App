@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ const toJournal = (row: any) => ({
   createdAt: row.created_at,
 });
 
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId, userId } = req.query;
   let rows: any[];
 
@@ -26,9 +27,9 @@ router.get('/', requireAuth, async (req, res) => {
   }
 
   res.json(rows.map(toJournal));
-});
+}));
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, asyncHandler(async (req, res) => {
   const userId = req.session.userId!;
   const { sessionId, weekIndex, content } = req.body;
 
@@ -59,6 +60,6 @@ router.post('/', requireAuth, async (req, res) => {
 
   const { rows } = await pool.query('SELECT * FROM journals WHERE id = $1', [id]);
   res.status(201).json(toJournal(rows[0]));
-});
+}));
 
 export default router;

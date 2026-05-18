@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ const toActivity = (row: any) => ({
   targetPct: row.target_pct,
 });
 
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId } = req.query;
   if (!sessionId) {
     res.status(400).json({ message: 'sessionId query param is required' });
@@ -26,6 +27,6 @@ router.get('/', requireAuth, async (req, res) => {
     [sessionId]
   );
   res.json(rows.map(toActivity));
-});
+}));
 
 export default router;

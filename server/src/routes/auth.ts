@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 import crypto from 'crypto';
 
 const router = Router();
@@ -60,7 +61,7 @@ const hasActiveParticipation = async (userId: string): Promise<boolean> => {
   return rows.length > 0;
 };
 
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ message: 'Email and password are required' });
@@ -79,7 +80,7 @@ router.post('/login', async (req, res) => {
     user: toUserResponse(user),
     hasActiveParticipation: await hasActiveParticipation(user.id),
   });
-});
+}));
 
 router.post('/logout', requireAuth, (req, res) => {
   req.session.destroy((err) => {
@@ -92,7 +93,7 @@ router.post('/logout', requireAuth, (req, res) => {
   });
 });
 
-router.get('/me', requireAuth, async (req, res) => {
+router.get('/me', requireAuth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId!]);
   const user = rows[0];
   if (!user) {
@@ -103,9 +104,9 @@ router.get('/me', requireAuth, async (req, res) => {
     user: toUserResponse(user),
     hasActiveParticipation: await hasActiveParticipation(user.id),
   });
-});
+}));
 
-router.post('/entra', async (req, res) => {
+router.post('/entra', asyncHandler(async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -160,6 +161,6 @@ router.post('/entra', async (req, res) => {
     console.error('Entra auth error:', err.message);
     res.status(401).json({ message: 'Authentication failed' });
   }
-});
+}));
 
 export default router;
