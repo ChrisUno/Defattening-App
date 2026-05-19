@@ -36,6 +36,7 @@ interface DataState {
   addUser: (input: { name: string; email: string; password?: string; role?: string }) => Promise<User>;
   updateUser: (userId: string, patch: Partial<User>) => Promise<void>;
   removeUser: (userId: string) => Promise<void>;
+  changeUserRole: (userId: string, role: 'admin' | 'user') => Promise<User>;
 
   joinSession: (input: { sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
   adminJoinSession: (input: { userId: string; sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
@@ -149,6 +150,14 @@ export const useDataStore = create<DataState>((set, get) => ({
       weighIns: s.weighIns.filter((w) => w.userId !== userId),
       journals: s.journals.filter((j) => j.userId !== userId),
     }));
+  },
+
+  changeUserRole: async (userId, role) => {
+    const updated = await api.patch<User>(`/api/users/${userId}/role`, { role });
+    set((s) => ({
+      users: s.users.map((u) => (u.id === userId ? updated : u)),
+    }));
+    return updated;
   },
 
   joinSession: async (input) => {

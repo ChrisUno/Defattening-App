@@ -26,7 +26,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
   if (!user) return <>{children}</>;
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
   const links = isAdmin
     ? [
         { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -103,6 +103,9 @@ export const Layout = ({ children }: LayoutProps) => {
                   )}
                 />
               </button>
+              {user.role === 'super_admin' && (
+                <span className="text-xs font-bold text-tangerine-500" title="Super Admin">👑</span>
+              )}
               <Avatar name={user.name} color={user.avatarColor} size="md" />
               <button
                 onClick={handleSignOut}

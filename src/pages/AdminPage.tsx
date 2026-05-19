@@ -52,8 +52,11 @@ const AdminPage = () => {
   const updateParticipation = useDataStore((s) => s.updateParticipation);
   const adminJoinSession = useDataStore((s) => s.adminJoinSession);
   const removeParticipation = useDataStore((s) => s.removeParticipation);
+  const changeUserRole = useDataStore((s) => s.changeUserRole);
   const currentAdmin = useAuthStore((s) => s.currentUser);
   const pushToast = useUiStore((s) => s.pushToast);
+
+  const isSuperAdmin = currentAdmin?.role === 'super_admin';
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [sessionOpen, setSessionOpen] = useState(false);
@@ -62,16 +65,29 @@ const AdminPage = () => {
 
   const userRows = useMemo(() => {
     return users
-      .filter((u) => u.role !== 'admin')
+      .filter((u) => u.id !== currentAdmin?.id)
       .map((u) => {
         const userParts = participations.filter((p) => p.userId === u.id);
         const sessionCount = userParts.length;
         const totalWeighIns = weighIns.filter((w) => w.userId === u.id).length;
         return { user: u, sessionCount, totalWeighIns };
       });
-  }, [users, participations, weighIns]);
+  }, [users, participations, weighIns, currentAdmin]);
 
-  if (!currentAdmin || currentAdmin.role !== 'admin') return null;
+  if (!currentAdmin || !['admin', 'super_admin'].includes(currentAdmin.role)) return null;
+
+  const handleRoleToggle = async (user: User) => {
+    const newRole = user.role === 'admin' ? 'user' : 'admin';
+    try {
+      await changeUserRole(user.id, newRole);
+      pushToast({
+        title: newRole === 'admin' ? `${user.name} promoted to Admin` : `${user.name} reverted to User`,
+        variant: 'success',
+      });
+    } catch (err: any) {
+      pushToast({ title: err.message || 'Failed to change role', variant: 'warning' });
+    }
+  };
 
   const handleInvite = async (input: { name: string; email: string; password?: string }) => {
     try {
@@ -107,7 +123,7 @@ const AdminPage = () => {
     <div className="space-y-10">
       <div>
         <Badge tone="grape" className="mb-3">
-          <Shield size={12} /> Admin control room
+          <Shield size={12} /> {isSuperAdmin ? '👑 Super Admin control room' : 'Admin control room'}
         </Badge>
         <h1 className="font-display text-4xl sm:text-5xl font-bold text-ink-900 leading-tight">
           You run this thing.
@@ -231,6 +247,12 @@ const AdminPage = () => {
                       <div className="flex items-center gap-3">
                         <Avatar name={user.name} color={user.avatarColor} size="sm" />
                         <span className="font-semibold text-ink-900">{user.name}</span>
+                        {user.role === 'super_admin' && (
+                          <Badge tone="grape">👑 Super Admin</Badge>
+                        )}
+                        {user.role === 'admin' && (
+                          <Badge tone="lime">Admin</Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3 text-ink-700 hidden sm:table-cell">{user.email}</td>
@@ -240,26 +262,49 @@ const AdminPage = () => {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="inline-flex items-center gap-1">
-                        <button
-                          onClick={() => setEditUser(user)}
-                          className="inline-flex items-center gap-1 rounded-xl border-2 border-ink-900/10 bg-cream-50 px-2.5 py-1 text-xs font-semibold text-ink-700 hover:bg-ink-900/5"
-                        >
-                          <Pencil size={12} /> Edit
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (window.confirm(`Remove ${user.name}? This deletes all their data.`)) {
-                              await removeUser(user.id);
-                              pushToast({
-                                title: `${user.name} removed`,
-                                variant: 'warning',
-                              });
-                            }
-                          }}
-                          className="inline-flex items-center gap-1 rounded-xl bg-rose-bright/10 px-2.5 py-1 text-xs font-semibold text-rose-bright hover:bg-rose-bright/20"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        {isSuperAdmin && user.role !== 'super_admin' && (
+                          <button
+                            onClick={() => handleRoleToggle(user)}
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-xl border-2 px-2.5 py-1 text-xs font-semibold',
+                              user.role === 'admin'
+                                ? 'border-tangerine-300 bg-tangerine-50 text-tangerine-700 hover:bg-tangerine-100'
+                                : 'border-grape-300 bg-grape-50 text-grape-700 hover:bg-grape-100',
+                            )}
+                            title={user.role === 'admin' ? 'Revoke admin' : 'Make admin'}
+                          >
+                            <Shield size={12} />
+                            {user.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+                          </button>
+                        )}
+                        {user.role !== 'super_admin' && (
+                          <button
+                            onClick={() => setEditUser(user)}
+                            className="inline-flex items-center gap-1 rounded-xl border-2 border-ink-900/10 bg-cream-50 px-2.5 py-1 text-xs font-semibold text-ink-700 hover:bg-ink-900/5"
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                        )}
+                        {user.role !== 'super_admin' && (
+                          <button
+                            onClick={async () => {
+                              if (window.confirm(`Remove ${user.name}? This deletes all their data.`)) {
+                                try {
+                                  await removeUser(user.id);
+                                  pushToast({
+                                    title: `${user.name} removed`,
+                                    variant: 'warning',
+                                  });
+                                } catch (err: any) {
+                                  pushToast({ title: err.message || 'Failed to remove user', variant: 'warning' });
+                                }
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl bg-rose-bright/10 px-2.5 py-1 text-xs font-semibold text-rose-bright hover:bg-rose-bright/20"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

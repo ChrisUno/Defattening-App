@@ -17,7 +17,7 @@ export const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) 
 
   if (!currentUser) return <Navigate to="/" replace />;
 
-  if (requireAdmin && currentUser.role !== 'admin') {
+  if (requireAdmin && !['admin', 'super_admin'].includes(currentUser.role)) {
     return <Navigate to="/dashboard" replace />;
   }
 
