@@ -2,20 +2,9 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { toSession } from '../lib/mappers.js';
 
 const router = Router();
-
-const toSession = (row: any) => ({
-  id: row.id,
-  name: row.name,
-  description: row.description,
-  weeks: row.weeks,
-  weighInDayOfWeek: row.weigh_in_day_of_week,
-  weighInNote: row.weigh_in_note,
-  startDate: row.start_date,
-  status: row.status,
-  createdBy: row.created_by,
-});
 
 router.get('/', requireAuth, asyncHandler(async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM sessions ORDER BY start_date DESC');

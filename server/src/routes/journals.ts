@@ -2,17 +2,9 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { toJournal } from '../lib/mappers.js';
 
 const router = Router();
-
-const toJournal = (row: any) => ({
-  id: row.id,
-  userId: row.user_id,
-  sessionId: row.session_id,
-  weekIndex: row.week_index,
-  content: row.content,
-  createdAt: row.created_at,
-});
 
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId, userId } = req.query;

@@ -2,24 +2,16 @@ import { Router } from 'express';
 import pool from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { toParticipation } from '../lib/mappers.js';
 
 const router = Router();
-
-const toPart = (row: any) => ({
-  id: row.id,
-  userId: row.user_id,
-  sessionId: row.session_id,
-  startWeightKg: row.start_weight_kg,
-  goalWeightKg: row.goal_weight_kg,
-  joinedAt: row.joined_at,
-});
 
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { sessionId } = req.query;
   const { rows } = sessionId
     ? await pool.query('SELECT * FROM participations WHERE session_id = $1', [sessionId])
     : await pool.query('SELECT * FROM participations');
-  res.json(rows.map(toPart));
+  res.json(rows.map(toParticipation));
 }));
 
 router.post('/', requireAuth, asyncHandler(async (req, res) => {
@@ -39,7 +31,7 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
     await pool.query('UPDATE participations SET start_weight_kg = $1, goal_weight_kg = $2 WHERE id = $3',
       [startWeightKg, goalWeightKg, existing[0].id]);
     const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [existing[0].id]);
-    res.json(toPart(rows[0]));
+    res.json(toParticipation(rows[0]));
     return;
   }
 
@@ -50,7 +42,7 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
   );
 
   const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
-  res.status(201).json(toPart(rows[0]));
+  res.status(201).json(toParticipation(rows[0]));
 }));
 
 router.patch('/:id', requireAuth, asyncHandler(async (req, res) => {
@@ -78,7 +70,7 @@ router.patch('/:id', requireAuth, asyncHandler(async (req, res) => {
   await pool.query(`UPDATE participations SET ${sets.join(', ')} WHERE id = $${idx}`, values);
 
   const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
-  res.json(toPart(rows[0]));
+  res.json(toParticipation(rows[0]));
 }));
 
 router.post('/admin', requireAdmin, asyncHandler(async (req, res) => {
@@ -103,7 +95,7 @@ router.post('/admin', requireAdmin, asyncHandler(async (req, res) => {
     await pool.query('UPDATE participations SET start_weight_kg = $1, goal_weight_kg = $2 WHERE id = $3',
       [startWeightKg, goalWeightKg, existing[0].id]);
     const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [existing[0].id]);
-    res.json(toPart(rows[0]));
+    res.json(toParticipation(rows[0]));
     return;
   }
 
@@ -114,7 +106,7 @@ router.post('/admin', requireAdmin, asyncHandler(async (req, res) => {
   );
 
   const { rows } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
-  res.status(201).json(toPart(rows[0]));
+  res.status(201).json(toParticipation(rows[0]));
 }));
 
 router.delete('/:id', requireAdmin, asyncHandler(async (req, res) => {

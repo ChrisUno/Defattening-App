@@ -6,6 +6,8 @@ import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import crypto from 'crypto';
+import { toUser } from '../lib/mappers.js';
+import { pickColor } from '../lib/avatarColors.js';
 
 const router = Router();
 
@@ -38,20 +40,6 @@ async function verifyEntraToken(token: string): Promise<any> {
   });
 }
 
-const AVATAR_COLORS = ['#2563EB', '#7C3AED', '#059669', '#DC2626', '#D97706', '#0891B2', '#4F46E5', '#BE185D'];
-
-const toUserResponse = (row: any) => ({
-  id: row.id,
-  email: row.email,
-  name: row.name,
-  avatarColor: row.avatar_color,
-  role: row.role,
-  heightCm: row.height_cm,
-  isTempAdmin: row.is_temp_admin,
-  tempAdminExpiresAt: row.temp_admin_expires_at,
-  createdAt: row.created_at,
-});
-
 const hasActiveParticipation = async (userId: string): Promise<boolean> => {
   const { rows } = await pool.query(
     `SELECT 1 FROM participations p
@@ -79,7 +67,7 @@ router.post('/login', asyncHandler(async (req, res) => {
 
   req.session.userId = user.id;
   res.json({
-    user: toUserResponse(user),
+    user: toUser(user),
     hasActiveParticipation: await hasActiveParticipation(user.id),
   });
 }));
@@ -103,7 +91,7 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
     return;
   }
   res.json({
-    user: toUserResponse(user),
+    user: toUser(user),
     hasActiveParticipation: await hasActiveParticipation(user.id),
   });
 }));
@@ -143,7 +131,7 @@ router.post('/entra', asyncHandler(async (req, res) => {
         }
       } else {
         const id = crypto.randomUUID();
-        const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+        const color = pickColor();
         const { rows } = await pool.query(
           `INSERT INTO users (id, email, name, avatar_color, role, entra_oid)
            VALUES ($1, $2, $3, $4, 'user', $5)
@@ -156,7 +144,7 @@ router.post('/entra', asyncHandler(async (req, res) => {
 
     req.session.userId = userRow.id;
     res.json({
-      user: toUserResponse(userRow),
+      user: toUser(userRow),
       hasActiveParticipation: await hasActiveParticipation(userRow.id),
     });
   } catch (err: any) {

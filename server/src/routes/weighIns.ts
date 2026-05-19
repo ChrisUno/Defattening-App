@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { computeLeaderboard, computeRanksForSession, currentWeekIndex } from '../lib/stats.js';
+import { toWeighIn, toActivity } from '../lib/mappers.js';
 
 interface WeighInStatus {
   sessionId: string;
@@ -12,28 +13,6 @@ interface WeighInStatus {
 }
 
 const router = Router();
-
-const toWeighIn = (row: any) => ({
-  id: row.id,
-  userId: row.user_id,
-  sessionId: row.session_id,
-  weightKg: row.weight_kg,
-  bodyFatPct: row.body_fat_pct,
-  weekIndex: row.week_index,
-  measuredAt: row.measured_at,
-  recordedAt: row.recorded_at,
-});
-
-const toActivity = (row: any) => ({
-  id: row.id,
-  type: row.type,
-  occurredAt: row.occurred_at,
-  sessionId: row.session_id,
-  actorUserId: row.actor_user_id,
-  targetUserId: row.target_user_id,
-  actorPct: row.actor_pct,
-  targetPct: row.target_pct,
-});
 
 const getLeaderboardData = async (sessionId: string) => {
   const { rows: sessionRows } = await pool.query('SELECT * FROM sessions WHERE id = $1', [sessionId]);

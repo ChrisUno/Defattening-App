@@ -3,23 +3,10 @@ import bcrypt from 'bcryptjs';
 import pool from '../db.js';
 import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { toUser } from '../lib/mappers.js';
+import { pickColor } from '../lib/avatarColors.js';
 
 const router = Router();
-
-const toUser = (row: any) => ({
-  id: row.id,
-  email: row.email,
-  name: row.name,
-  avatarColor: row.avatar_color,
-  role: row.role,
-  heightCm: row.height_cm,
-  isTempAdmin: row.is_temp_admin,
-  tempAdminExpiresAt: row.temp_admin_expires_at,
-  createdAt: row.created_at,
-});
-
-const AVATAR_COLORS = ['#2563EB', '#1D4ED8', '#0EA5E9', '#0284C7', '#06B6D4', '#0891B2', '#3B82F6', '#6366F1', '#4F46E5', '#7C3AED', '#8B5CF6', '#0F766E', '#14B8A6'];
-const pickColor = () => AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 
 router.get('/', requireAuth, asyncHandler(async (_req, res) => {
   const { rows } = await pool.query('SELECT * FROM users ORDER BY created_at');
