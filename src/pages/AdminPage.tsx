@@ -22,6 +22,7 @@ import { Dialog } from '../components/ui/Dialog';
 import { Input, Label, Textarea } from '../components/ui/Input';
 import { Avatar } from '../components/ui/Avatar';
 import { ToggleSwitch } from '../components/ui/ToggleSwitch';
+import { CalendarPicker } from '../components/ui/CalendarPicker';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
@@ -829,6 +830,7 @@ const EditUserDialog = ({ user, onClose, onSave, onTempAdminChange, isSuperAdmin
   const [heightCm, setHeightCm] = useState('');
   const [isTempAdmin, setIsTempAdmin] = useState(false);
   const [tempExpiry, setTempExpiry] = useState('');
+  const [activeTab, setActiveTab] = useState<'profile' | 'admin'>('profile');
   const [parts, setParts] = useState<
     { id: string; sessionName: string; startWeightKg: string; goalWeightKg: string }[]
   >([]);
@@ -839,7 +841,8 @@ const EditUserDialog = ({ user, onClose, onSave, onTempAdminChange, isSuperAdmin
     setEmail(user.email);
     setHeightCm(user.heightCm?.toString() ?? '');
     setIsTempAdmin(user.isTempAdmin ?? false);
-    setTempExpiry(user.tempAdminExpiresAt ? user.tempAdminExpiresAt.slice(0, 16) : '');
+    setTempExpiry(user.tempAdminExpiresAt ? user.tempAdminExpiresAt.slice(0, 10) : '');
+    setActiveTab('profile');
     setParts(
       participations
         .filter((p) => p.userId === user.id)
@@ -863,6 +866,7 @@ const EditUserDialog = ({ user, onClose, onSave, onTempAdminChange, isSuperAdmin
     setHeightCm('');
     setIsTempAdmin(false);
     setTempExpiry('');
+    setActiveTab('profile');
     setParts([]);
     onClose();
   };
@@ -894,105 +898,165 @@ const EditUserDialog = ({ user, onClose, onSave, onTempAdminChange, isSuperAdmin
     setHeightCm('');
     setIsTempAdmin(false);
     setTempExpiry('');
+    setActiveTab('profile');
     setParts([]);
   };
 
+  const showAdminTab = isSuperAdmin && user.role === 'user';
+
   return (
     <Dialog open={!!user} onClose={close} maxWidth="lg" title={`Edit ${user.name}`}>
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <div>
-            <Label>Height</Label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              min="100"
-              max="230"
-              value={heightCm}
-              onChange={(e) => setHeightCm(e.target.value)}
-              suffix="cm"
-              placeholder="172"
-            />
-          </div>
-        </div>
-
-        {isSuperAdmin && user.role === 'user' && (
-          <div className="rounded-2xl border-2 border-grape-200 bg-grape-50/40 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-ink-900">🛡️ Temporary Admin</p>
-                <p className="text-xs text-ink-500">Grant full admin access while you're away</p>
-              </div>
-              <ToggleSwitch
-                checked={isTempAdmin}
-                onChange={setIsTempAdmin}
-              />
-            </div>
-            {isTempAdmin && (
-              <div>
-                <Label>Expires at (optional)</Label>
-                <Input
-                  type="datetime-local"
-                  value={tempExpiry}
-                  onChange={(e) => setTempExpiry(e.target.value)}
-                />
-                <p className="text-xs text-ink-400 mt-1">
-                  Leave empty = stays admin until you toggle off
-                </p>
-              </div>
-            )}
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        {/* Tab bar */}
+        {showAdminTab && (
+          <div className="flex gap-1 border-b-2 border-ink-900/10">
+            <button
+              type="button"
+              onClick={() => setActiveTab('profile')}
+              className={cn(
+                'px-4 py-2 text-sm font-bold rounded-t-xl transition-colors',
+                activeTab === 'profile'
+                  ? 'bg-cream-100 text-ink-900 border-b-2 border-grape-500 -mb-[2px]'
+                  : 'text-ink-500 hover:text-ink-700',
+              )}
+            >
+              Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('admin')}
+              className={cn(
+                'px-4 py-2 text-sm font-bold rounded-t-xl transition-colors',
+                activeTab === 'admin'
+                  ? 'bg-cream-100 text-ink-900 border-b-2 border-grape-500 -mb-[2px]'
+                  : 'text-ink-500 hover:text-ink-700',
+              )}
+            >
+              <Shield size={12} className="inline mr-1" />
+              Admin
+            </button>
           </div>
         )}
 
-        <div>
-          <Label>Per-session data</Label>
-          <div className="space-y-2">
-            {parts.length === 0 ? (
-              <p className="text-sm text-ink-500">Not in any session yet.</p>
-            ) : (
-              parts.map((p, idx) => (
-                <div
-                  key={p.id}
-                  className="rounded-2xl border-2 border-ink-900/10 bg-cream-50 p-3 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end"
-                >
-                  <div className="text-sm font-semibold sm:col-span-1 truncate">{p.sessionName}</div>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={p.startWeightKg}
-                    onChange={(e) => {
-                      const next = [...parts];
-                      next[idx] = { ...next[idx], startWeightKg: e.target.value };
-                      setParts(next);
-                    }}
-                    suffix="kg start"
-                  />
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={p.goalWeightKg}
-                    onChange={(e) => {
-                      const next = [...parts];
-                      next[idx] = { ...next[idx], goalWeightKg: e.target.value };
-                      setParts(next);
-                    }}
-                    suffix="kg goal"
-                  />
-                </div>
-              ))
-            )}
+        {/* Profile tab */}
+        {activeTab === 'profile' && (
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Height</Label>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min="100"
+                  max="230"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                  suffix="cm"
+                  placeholder="172"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Per-session data</Label>
+              <div className="space-y-2">
+                {parts.length === 0 ? (
+                  <p className="text-sm text-ink-500">Not in any session yet.</p>
+                ) : (
+                  parts.map((p, idx) => (
+                    <div
+                      key={p.id}
+                      className="rounded-2xl border-2 border-ink-900/10 bg-cream-50 p-3 grid grid-cols-1 sm:grid-cols-3 gap-2 items-end"
+                    >
+                      <div className="text-sm font-semibold sm:col-span-1 truncate">{p.sessionName}</div>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={p.startWeightKg}
+                        onChange={(e) => {
+                          const next = [...parts];
+                          next[idx] = { ...next[idx], startWeightKg: e.target.value };
+                          setParts(next);
+                        }}
+                        suffix="kg start"
+                      />
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={p.goalWeightKg}
+                        onChange={(e) => {
+                          const next = [...parts];
+                          next[idx] = { ...next[idx], goalWeightKg: e.target.value };
+                          setParts(next);
+                        }}
+                        suffix="kg goal"
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Admin tab */}
+        {activeTab === 'admin' && showAdminTab && (
+          <div className="flex flex-col gap-4 min-h-[260px]">
+            {/* Permissions summary */}
+            <div className="rounded-2xl border-2 border-ink-900/10 bg-cream-100/60 p-4 space-y-2">
+              <p className="text-sm font-bold text-ink-900 flex items-center gap-2">
+                <Shield size={14} className="text-grape-500" /> Admin Permissions
+              </p>
+              <ul className="text-xs text-ink-600 space-y-1.5 pl-5 list-disc">
+                <li>Create, edit, and delete weight-loss sessions</li>
+                <li>Invite new users and remove existing users</li>
+                <li>Add or remove participants from any session</li>
+                <li>Edit any user's profile and weigh-in data</li>
+                <li>Access the full Admin control room</li>
+              </ul>
+            </div>
+
+            {/* Toggle + calendar picker */}
+            <div className="rounded-2xl border-2 border-grape-200 bg-grape-50/40 p-4 space-y-3 mt-auto">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <ToggleSwitch checked={isTempAdmin} onChange={setIsTempAdmin} />
+                  <div>
+                    <p className="text-sm font-bold text-ink-900">🛡️ Temporary Admin</p>
+                    <p className="text-xs text-ink-500">Grant full admin access for a limited time</p>
+                  </div>
+                </div>
+
+                {isTempAdmin && (
+                  <CalendarPicker
+                    value={tempExpiry}
+                    onChange={setTempExpiry}
+                    minDate={new Date()}
+                    placeholder="Expiry date"
+                  />
+                )}
+              </div>
+              {isTempAdmin && !tempExpiry && (
+                <p className="text-xs text-ink-400">No expiry set — admin access stays until manually revoked.</p>
+              )}
+              {isTempAdmin && tempExpiry && (
+                <p className="text-xs text-grape-600">
+                  Admin access will be revoked on {format(new Date(tempExpiry), 'MMM d, yyyy')}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={close} leftIcon={<X size={14} />}>
