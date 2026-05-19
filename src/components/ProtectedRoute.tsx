@@ -28,6 +28,7 @@ export const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) 
     && location.pathname !== '/onboarding'
     && location.pathname !== '/admin'
     && location.pathname !== '/dashboard'
+    && location.pathname !== '/journal'
   ) {
     return <Navigate to="/dashboard" replace />;
   }

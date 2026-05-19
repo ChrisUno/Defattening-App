@@ -38,6 +38,11 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
     return;
   }
 
+  if (content.length > 5000) {
+    res.status(400).json({ message: 'Journal entry cannot exceed 5,000 characters' });
+    return;
+  }
+
   const { rows: existing } = await pool.query(
     'SELECT id FROM journals WHERE user_id = $1 AND session_id = $2 AND week_index = $3',
     [userId, sessionId, weekIndex]

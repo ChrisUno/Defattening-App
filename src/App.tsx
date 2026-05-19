@@ -8,6 +8,7 @@ import LeaderboardPage from './pages/LeaderboardPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 import ResultsPage from './pages/ResultsPage';
+import JournalPage from './pages/JournalPage';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ToastViewport } from './components/ui/Toast';
@@ -106,6 +107,16 @@ const App = ({ basename }: AppProps) => {
                 <ProtectedRoute>
                   <Layout>
                     <ResultsPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/journal"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <JournalPage />
                   </Layout>
                 </ProtectedRoute>
               }

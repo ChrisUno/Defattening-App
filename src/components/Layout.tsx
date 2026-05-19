@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router';
-import { LayoutDashboard, Trophy, Shield, UserCircle2, LogOut, Flame, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Trophy, Shield, UserCircle2, LogOut, Flame, Sun, Moon, NotebookPen } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useUiStore } from '../store/uiStore';
 import { Avatar } from './ui/Avatar';
@@ -14,6 +14,7 @@ interface LayoutProps {
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+  { to: '/journal', label: 'Journal', icon: NotebookPen },
   { to: '/profile', label: 'Profile', icon: UserCircle2 },
 ];
 
@@ -31,6 +32,7 @@ export const Layout = ({ children }: LayoutProps) => {
     ? [
         { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { to: '/leaderboard', label: 'Leaderboard', icon: Trophy },
+        { to: '/journal', label: 'Journal', icon: NotebookPen },
         { to: '/admin', label: 'Admin', icon: Shield },
         { to: '/profile', label: 'Profile', icon: UserCircle2 },
       ]
