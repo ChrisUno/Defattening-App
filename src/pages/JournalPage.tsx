@@ -44,7 +44,11 @@ const DEBOUNCE_MS = 2000;
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SessionCountdown({ session }: { session: { startDate: string; weeks: number } }) {
+interface SessionCountdownProps {
+  session: { startDate: string; weeks: number };
+}
+
+const SessionCountdown = ({ session }: SessionCountdownProps) => {
   const endDate = addWeeks(parseISO(session.startDate), session.weeks);
   const daysLeft = differenceInCalendarDays(endDate, new Date());
 
@@ -79,19 +83,17 @@ function SessionCountdown({ session }: { session: { startDate: string; weeks: nu
       </div>
     </div>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
 
-function CurrentWeekEditor({
-  sessionId,
-  weekIndex,
-  existing,
-}: {
+interface CurrentWeekEditorProps {
   sessionId: string;
   weekIndex: number;
   existing: string;
-}) {
+}
+
+const CurrentWeekEditor = ({ sessionId, weekIndex, existing }: CurrentWeekEditorProps) => {
   const saveJournal = useDataStore((s) => s.saveJournal);
   const [content, setContent] = useState(existing);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -219,19 +221,17 @@ function CurrentWeekEditor({
       </div>
     </Card>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
 
-function JournalHistory({
-  session,
-  currentWeek,
-  journals,
-}: {
+interface JournalHistoryProps {
   session: { id: string; weeks: number; startDate: string };
   currentWeek: number;
   journals: { weekIndex: number; content: string; createdAt: string }[];
-}) {
+}
+
+const JournalHistory = ({ session, currentWeek, journals }: JournalHistoryProps) => {
   const weeks = Array.from({ length: session.weeks }, (_, i) => i)
     .filter((i) => i !== currentWeek)
     .reverse();
@@ -267,23 +267,19 @@ function JournalHistory({
       })}
     </div>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
 
-function TipsSidebar({
-  userJournals,
-  currentEntryText,
-  weighIns,
-  userId,
-  sessionId,
-}: {
+interface TipsSidebarProps {
   userJournals: { content: string; weekIndex: number }[];
   currentEntryText: string;
   weighIns: { userId: string; sessionId: string; weekIndex: number; weightKg: number }[];
   userId: string;
   sessionId: string;
-}) {
+}
+
+const TipsSidebar = ({ userJournals, currentEntryText, weighIns, userId, sessionId }: TipsSidebarProps) => {
   const dayIdx = getDayOfYearIndex();
 
   // --- Diet detection ---
@@ -405,7 +401,7 @@ function TipsSidebar({
       )}
     </div>
   );
-}
+};
 
 // ---------------------------------------------------------------------------
 // Main Page
