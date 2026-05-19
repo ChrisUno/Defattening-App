@@ -121,6 +121,9 @@ defattening/
 ### Starting the dev environment
 
 ```bash
+# First-time setup — copy env template (DB defaults match docker-compose, no edits needed for local dev)
+cp .env.example .env
+
 # Start PostgreSQL
 docker compose up -d postgres
 
