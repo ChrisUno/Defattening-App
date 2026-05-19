@@ -37,6 +37,7 @@ interface DataState {
   updateUser: (userId: string, patch: Partial<User>) => Promise<void>;
   removeUser: (userId: string) => Promise<void>;
   changeUserRole: (userId: string, role: 'admin' | 'user') => Promise<User>;
+  setTempAdmin: (userId: string, isTempAdmin: boolean, expiresAt?: string | null) => Promise<User>;
 
   joinSession: (input: { sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
   adminJoinSession: (input: { userId: string; sessionId: string; startWeightKg: number; goalWeightKg: number }) => Promise<Participation>;
@@ -154,6 +155,14 @@ export const useDataStore = create<DataState>((set, get) => ({
 
   changeUserRole: async (userId, role) => {
     const updated = await api.patch<User>(`/api/users/${userId}/role`, { role });
+    set((s) => ({
+      users: s.users.map((u) => (u.id === userId ? updated : u)),
+    }));
+    return updated;
+  },
+
+  setTempAdmin: async (userId, isTempAdmin, expiresAt) => {
+    const updated = await api.patch<User>(`/api/users/${userId}/temp-admin`, { isTempAdmin, expiresAt });
     set((s) => ({
       users: s.users.map((u) => (u.id === userId ? updated : u)),
     }));

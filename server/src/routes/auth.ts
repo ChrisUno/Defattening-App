@@ -47,6 +47,8 @@ const toUserResponse = (row: any) => ({
   avatarColor: row.avatar_color,
   role: row.role,
   heightCm: row.height_cm,
+  isTempAdmin: row.is_temp_admin,
+  tempAdminExpiresAt: row.temp_admin_expires_at,
   createdAt: row.created_at,
 });
 

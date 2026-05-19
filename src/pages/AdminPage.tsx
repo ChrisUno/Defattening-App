@@ -21,6 +21,7 @@ import { Button } from '../components/ui/Button';
 import { Dialog } from '../components/ui/Dialog';
 import { Input, Label, Textarea } from '../components/ui/Input';
 import { Avatar } from '../components/ui/Avatar';
+import { ToggleSwitch } from '../components/ui/ToggleSwitch';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import { useUiStore } from '../store/uiStore';
@@ -253,6 +254,9 @@ const AdminPage = () => {
                         {user.role === 'admin' && (
                           <Badge tone="lime">Admin</Badge>
                         )}
+                        {user.isTempAdmin && user.role !== 'admin' && user.role !== 'super_admin' && (
+                          <Badge tone="grape">🛡️ Temp Admin</Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-3 py-3 text-ink-700 hidden sm:table-cell">{user.email}</td>
@@ -360,6 +364,7 @@ const AdminPage = () => {
       <EditUserDialog
         user={editUser}
         onClose={() => setEditUser(null)}
+        isSuperAdmin={isSuperAdmin}
         onSave={async (patch, partUpdates) => {
           if (!editUser) return;
           await updateUser(editUser.id, patch);
@@ -368,6 +373,10 @@ const AdminPage = () => {
           }
           pushToast({ title: `${patch.name ?? editUser.name} updated`, variant: 'success' });
           setEditUser(null);
+        }}
+        onTempAdminChange={async (userId, tempAdmin, expiresAt) => {
+          const setTempAdmin = useDataStore.getState().setTempAdmin;
+          await setTempAdmin(userId, tempAdmin, expiresAt);
         }}
       />
     </div>
@@ -807,15 +816,19 @@ interface EditUserDialogProps {
     patch: Partial<User>,
     partUpdates: { id: string; startWeightKg: number; goalWeightKg: number }[],
   ) => void;
+  onTempAdminChange?: (userId: string, isTempAdmin: boolean, expiresAt: string | null) => Promise<void>;
+  isSuperAdmin: boolean;
 }
 
-const EditUserDialog = ({ user, onClose, onSave }: EditUserDialogProps) => {
+const EditUserDialog = ({ user, onClose, onSave, onTempAdminChange, isSuperAdmin }: EditUserDialogProps) => {
   const participations = useDataStore((s) => s.participations);
   const sessions = useDataStore((s) => s.sessions);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [heightCm, setHeightCm] = useState('');
+  const [isTempAdmin, setIsTempAdmin] = useState(false);
+  const [tempExpiry, setTempExpiry] = useState('');
   const [parts, setParts] = useState<
     { id: string; sessionName: string; startWeightKg: string; goalWeightKg: string }[]
   >([]);
@@ -825,6 +838,8 @@ const EditUserDialog = ({ user, onClose, onSave }: EditUserDialogProps) => {
     setName(user.name);
     setEmail(user.email);
     setHeightCm(user.heightCm?.toString() ?? '');
+    setIsTempAdmin(user.isTempAdmin ?? false);
+    setTempExpiry(user.tempAdminExpiresAt ? user.tempAdminExpiresAt.slice(0, 16) : '');
     setParts(
       participations
         .filter((p) => p.userId === user.id)
@@ -846,6 +861,8 @@ const EditUserDialog = ({ user, onClose, onSave }: EditUserDialogProps) => {
     setName('');
     setEmail('');
     setHeightCm('');
+    setIsTempAdmin(false);
+    setTempExpiry('');
     setParts([]);
     onClose();
   };
@@ -861,9 +878,22 @@ const EditUserDialog = ({ user, onClose, onSave }: EditUserDialogProps) => {
         goalWeightKg: Number(p.goalWeightKg),
       })),
     );
+
+    // Fire temp admin change if it differs from original
+    const origTemp = user.isTempAdmin ?? false;
+    if (onTempAdminChange && isTempAdmin !== origTemp) {
+      const expiry = isTempAdmin && tempExpiry ? tempExpiry : null;
+      onTempAdminChange(user.id, isTempAdmin, expiry);
+    } else if (onTempAdminChange && isTempAdmin && tempExpiry !== (user.tempAdminExpiresAt?.slice(0, 16) ?? '')) {
+      // Expiry changed but toggle stayed on
+      onTempAdminChange(user.id, true, tempExpiry || null);
+    }
+
     setName('');
     setEmail('');
     setHeightCm('');
+    setIsTempAdmin(false);
+    setTempExpiry('');
     setParts([]);
   };
 
@@ -895,6 +925,34 @@ const EditUserDialog = ({ user, onClose, onSave }: EditUserDialogProps) => {
             />
           </div>
         </div>
+
+        {isSuperAdmin && user.role === 'user' && (
+          <div className="rounded-2xl border-2 border-grape-200 bg-grape-50/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-ink-900">🛡️ Temporary Admin</p>
+                <p className="text-xs text-ink-500">Grant full admin access while you're away</p>
+              </div>
+              <ToggleSwitch
+                checked={isTempAdmin}
+                onChange={setIsTempAdmin}
+              />
+            </div>
+            {isTempAdmin && (
+              <div>
+                <Label>Expires at (optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={tempExpiry}
+                  onChange={(e) => setTempExpiry(e.target.value)}
+                />
+                <p className="text-xs text-ink-400 mt-1">
+                  Leave empty = stays admin until you toggle off
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <Label>Per-session data</Label>

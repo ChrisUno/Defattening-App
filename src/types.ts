@@ -7,6 +7,8 @@ export interface User {
   avatarColor: string;
   role: UserRole;
   heightCm?: number;
+  isTempAdmin?: boolean;
+  tempAdminExpiresAt?: string | null;
   createdAt: string;
 }
 

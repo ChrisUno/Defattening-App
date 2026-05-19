@@ -26,7 +26,7 @@ export const Layout = ({ children }: LayoutProps) => {
 
   if (!user) return <>{children}</>;
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.isTempAdmin;
   const links = isAdmin
     ? [
         { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },

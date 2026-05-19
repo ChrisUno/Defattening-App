@@ -13,6 +13,8 @@ const toUser = (row: any) => ({
   avatarColor: row.avatar_color,
   role: row.role,
   heightCm: row.height_cm,
+  isTempAdmin: row.is_temp_admin,
+  tempAdminExpiresAt: row.temp_admin_expires_at,
   createdAt: row.created_at,
 });
 
@@ -77,6 +79,37 @@ router.patch('/:id/role', requireSuperAdmin, asyncHandler(async (req, res) => {
   }
 
   await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+  const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  res.json(toUser(rows[0]));
+}));
+
+router.patch('/:id/temp-admin', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { isTempAdmin, expiresAt } = req.body;
+
+  if (typeof isTempAdmin !== 'boolean') {
+    res.status(400).json({ message: 'isTempAdmin must be a boolean' });
+    return;
+  }
+
+  const { rows: target } = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
+  if (!target[0]) {
+    res.status(404).json({ message: 'User not found' });
+    return;
+  }
+  if (target[0].role === 'super_admin') {
+    res.status(403).json({ message: "Super admins don't need temp admin" });
+    return;
+  }
+
+  // If toggling off, also clear expiry
+  const expiry = isTempAdmin ? (expiresAt ?? null) : null;
+
+  await pool.query(
+    'UPDATE users SET is_temp_admin = $1, temp_admin_expires_at = $2 WHERE id = $3',
+    [isTempAdmin, expiry, id]
+  );
+
   const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
   res.json(toUser(rows[0]));
 }));

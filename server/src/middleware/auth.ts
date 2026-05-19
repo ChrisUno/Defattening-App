@@ -20,8 +20,26 @@ export const requireAdmin = async (req: Request, res: Response, next: NextFuncti
     res.status(401).json({ message: 'Authentication required' });
     return;
   }
-  const { rows } = await pool.query('SELECT role FROM users WHERE id = $1', [req.session.userId]);
-  if (!rows[0] || !['admin', 'super_admin'].includes(rows[0].role)) {
+  const { rows } = await pool.query(
+    'SELECT role, is_temp_admin, temp_admin_expires_at FROM users WHERE id = $1',
+    [req.session.userId]
+  );
+  if (!rows[0]) {
+    res.status(401).json({ message: 'User not found' });
+    return;
+  }
+
+  const user = rows[0];
+  const isRoleAdmin = ['admin', 'super_admin'].includes(user.role);
+
+  // Check temp admin — auto-expire if past deadline
+  let isTempAdmin = user.is_temp_admin;
+  if (isTempAdmin && user.temp_admin_expires_at && new Date(user.temp_admin_expires_at) < new Date()) {
+    await pool.query('UPDATE users SET is_temp_admin = false, temp_admin_expires_at = null WHERE id = $1', [req.session.userId]);
+    isTempAdmin = false;
+  }
+
+  if (!isRoleAdmin && !isTempAdmin) {
     res.status(403).json({ message: 'Admin access required' });
     return;
   }
