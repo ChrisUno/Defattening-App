@@ -6,6 +6,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
+import rateLimit from 'express-rate-limit';
+
 import pool from './db.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
@@ -25,12 +27,11 @@ const PORT = process.env.PORT || 3001;
 
 if (isProduction) {
   app.set('trust proxy', 1);
-  if (process.env.CORS_ORIGIN) {
-    app.use(cors({
-      origin: process.env.CORS_ORIGIN,
-      credentials: true,
-    }));
+  const corsOrigin = process.env.CORS_ORIGIN;
+  if (corsOrigin) {
+    app.use(cors({ origin: corsOrigin, credentials: true }));
   }
+  // No CORS middleware when same-origin (single-container deploy)
 } else {
   app.use(cors({
     origin: 'http://localhost:5173',
@@ -46,7 +47,11 @@ app.use(session({
     tableName: 'http_sessions',
     createTableIfMissing: false,
   }),
-  secret: process.env.SESSION_SECRET || 'defattening-secret-key-change-in-prod',
+  secret: (() => {
+    const s = process.env.SESSION_SECRET;
+    if (!s && isProduction) throw new Error('SESSION_SECRET env var is required in production');
+    return s || 'defattening-dev-secret';
+  })(),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -57,7 +62,24 @@ app.use(session({
   },
 }));
 
-app.use('/api/auth', authRoutes);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts, please try again later' },
+});
+
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'unhealthy', timestamp: new Date().toISOString() });
+  }
+});
+
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/participations', participationRoutes);

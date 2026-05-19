@@ -41,8 +41,8 @@ const LoginPage = () => {
     }
   }, []);
 
-  const [email, setEmail] = useState('alex.morgan@unosquare.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState(import.meta.env.DEV ? 'alex.morgan@unosquare.com' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? 'password123' : '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [entraLoading, setEntraLoading] = useState(false);
@@ -218,86 +218,90 @@ const LoginPage = () => {
                 {entraLoading ? 'Signing in…' : 'Sign in with Microsoft'}
               </button>
 
-              <div className="mt-6 flex items-center gap-3">
-                <div className="flex-1 h-px bg-ink-900/10" />
-                <span className="text-xs font-medium text-ink-400 uppercase tracking-wider">or</span>
-                <div className="flex-1 h-px bg-ink-900/10" />
-              </div>
+              {import.meta.env.DEV && (
+                <>
+                  <div className="mt-6 flex items-center gap-3">
+                    <div className="flex-1 h-px bg-ink-900/10" />
+                    <span className="text-xs font-medium text-ink-400 uppercase tracking-wider">or</span>
+                    <div className="flex-1 h-px bg-ink-900/10" />
+                  </div>
 
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => setDevExpanded(!devExpanded)}
-                  className="flex items-center gap-2 text-xs font-bold text-ink-500 hover:text-ink-700 transition-colors uppercase tracking-wider"
-                >
-                  <ChevronDown
-                    size={14}
-                    className={cn('transition-transform', devExpanded && 'rotate-180')}
-                  />
-                  Sign in with email {!import.meta.env.DEV ? '' : '(dev)'}
-                </button>
+                  <div className="mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setDevExpanded(!devExpanded)}
+                      className="flex items-center gap-2 text-xs font-bold text-ink-500 hover:text-ink-700 transition-colors uppercase tracking-wider"
+                    >
+                      <ChevronDown
+                        size={14}
+                        className={cn('transition-transform', devExpanded && 'rotate-180')}
+                      />
+                      Sign in with email (dev)
+                    </button>
 
-                {devExpanded && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-                      <div>
-                        <Label htmlFor="email">Work email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          autoComplete="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@unosquare.com"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          autoComplete="current-password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                        />
-                      </div>
+                    {devExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+                          <div>
+                            <Label htmlFor="email">Work email</Label>
+                            <Input
+                              id="email"
+                              type="email"
+                              autoComplete="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder="you@unosquare.com"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="password">Password</Label>
+                            <Input
+                              id="password"
+                              type="password"
+                              autoComplete="current-password"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="••••••••"
+                              required
+                            />
+                          </div>
 
-                      <Button type="submit" size="lg" className="w-full" rightIcon={<ArrowRight size={18} />} disabled={loading || entraLoading}>
-                        {loading ? 'Signing in…' : "Let's go"}
-                      </Button>
-                    </form>
+                          <Button type="submit" size="lg" className="w-full" rightIcon={<ArrowRight size={18} />} disabled={loading || entraLoading}>
+                            {loading ? 'Signing in…' : "Let's go"}
+                          </Button>
+                        </form>
 
-                    <div className="mt-5">
-                      <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500 mb-2">
-                        Demo logins
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {demoUsers.map((d) => (
-                          <button
-                            key={d.email}
-                            onClick={() => quickSignIn(d.email, d.pw)}
-                            type="button"
-                            className="rounded-xl border-2 border-ink-900/10 bg-cream-100 px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:border-tangerine-300 hover:bg-tangerine-50"
-                          >
-                            {d.label}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="mt-3 text-[11px] text-ink-500">
-                        Password for users is <span className="font-mono font-bold">password123</span>, admin is{' '}
-                        <span className="font-mono font-bold">admin123</span>.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+                        <div className="mt-5">
+                          <p className="text-[11px] uppercase tracking-wider font-bold text-ink-500 mb-2">
+                            Demo logins
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {demoUsers.map((d) => (
+                              <button
+                                key={d.email}
+                                onClick={() => quickSignIn(d.email, d.pw)}
+                                type="button"
+                                className="rounded-xl border-2 border-ink-900/10 bg-cream-100 px-3 py-2 text-left text-xs font-semibold text-ink-700 hover:border-tangerine-300 hover:bg-tangerine-50"
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="mt-3 text-[11px] text-ink-500">
+                            Password for users is <span className="font-mono font-bold">password123</span>, admin is{' '}
+                            <span className="font-mono font-bold">admin123</span>.
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </motion.div>
