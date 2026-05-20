@@ -12,7 +12,8 @@ import { pickColor } from '../lib/avatarColors.js';
 const router = Router();
 
 const ENTRA_TENANT_ID = process.env.ENTRA_TENANT_ID || 'eedd1340-df1a-4db2-8a03-b4cfb1fa3e9d';
-const ENTRA_API_CLIENT_ID = process.env.ENTRA_API_CLIENT_ID || '34d4bbb3-6a41-4437-8717-9c07086c8e0a';
+const ENTRA_API_CLIENT_ID = process.env.ENTRA_API_CLIENT_ID || '08cad655-0f77-4c30-8db4-b206df38d347';
+const ENTRA_API_AUDIENCE = process.env.ENTRA_API_AUDIENCE || `api://${ENTRA_API_CLIENT_ID}`;
 
 const jwksRsaClient = jwksClient({
   jwksUri: `https://login.microsoftonline.com/${ENTRA_TENANT_ID}/discovery/v2.0/keys`,
@@ -34,8 +35,11 @@ async function verifyEntraToken(token: string): Promise<any> {
   if (!decoded) throw new Error('Invalid token');
   const publicKey = await getSigningKey(decoded.header);
   return jwt.verify(token, publicKey, {
-    audience: ENTRA_API_CLIENT_ID,
-    issuer: `https://login.microsoftonline.com/${ENTRA_TENANT_ID}/v2.0`,
+    audience: [ENTRA_API_CLIENT_ID, ENTRA_API_AUDIENCE],
+    issuer: [
+      `https://login.microsoftonline.com/${ENTRA_TENANT_ID}/v2.0`,
+      `https://sts.windows.net/${ENTRA_TENANT_ID}/`,
+    ],
     algorithms: ['RS256'],
   });
 }

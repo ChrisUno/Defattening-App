@@ -49,8 +49,9 @@ const LoginPage = () => {
   const [devExpanded, setDevExpanded] = useState(true);
 
   const navigateAfterLogin = () => {
-    const { hasActiveParticipation } = useAuthStore.getState();
-    navigate(hasActiveParticipation ? '/dashboard' : '/onboarding');
+    const { hasActiveParticipation, currentUser } = useAuthStore.getState();
+    const isAdmin = currentUser && ['admin', 'super_admin'].includes(currentUser.role);
+    navigate(hasActiveParticipation || isAdmin ? '/dashboard' : '/onboarding');
   };
 
   const handleEntraSignIn = async () => {

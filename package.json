@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n fe,api -c blue,green \"npm run dev:frontend\" \"npm run dev:server\"",
-    "dev:frontend": "vite",
-    "dev:server": "npm run dev --prefix server",
+    "dev": "NODE_ENV=development concurrently -k -n fe,api -c blue,green \"npm run dev:frontend\" \"npm run dev:server\"",
+    "dev:frontend": "NODE_ENV=development vite",
+    "dev:server": "NODE_ENV=development npm run dev --prefix server",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
