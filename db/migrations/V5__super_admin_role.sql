@@ -1,3 +1,6 @@
+-- Widen role column to fit 'super_admin' (11 chars > varchar(10))
+ALTER TABLE users ALTER COLUMN role TYPE varchar(20);
+
 -- Expand role CHECK constraint to include 'super_admin'
 ALTER TABLE users DROP CONSTRAINT users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check
