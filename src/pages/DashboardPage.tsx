@@ -144,7 +144,7 @@ const DashboardPage = () => {
   const needsJoin = !hasAnyParticipation || !session || !participation || !myStats;
 
   // Below values only valid when needsJoin is false
-  const hasEnoughDataForBoard = !needsJoin && weighIns.filter((w) => w.sessionId === session.id).length >= 4;
+  const hasEnoughDataForBoard = !needsJoin && leaderboard.length >= 2;
   const topUserId = leaderboard[0]?.userId;
   const myRank = leaderboard.findIndex((p) => p.userId === user.id) + 1;
   const today = startOfDay(new Date());

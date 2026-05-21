@@ -16,9 +16,9 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM users ORDER BY created_at');
   res.json(rows.map((row: any) => {
     const u = toUser(row);
-    // Strip heightCm for non-self, non-admin — height is personal data
+    // Strip personal data for non-self, non-admin
     if (!isAdmin && u.id !== currentUserId) {
-      return { ...u, heightCm: null };
+      return { ...u, email: null, heightCm: null };
     }
     return u;
   }));
