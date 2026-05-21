@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
-import { Flame, ArrowRight, Sparkles, Trophy, Crown, Sun, Moon, ChevronDown } from 'lucide-react';
+import { ArrowRight, Sparkles, Trophy, Crown, Sun, Moon, ChevronDown } from 'lucide-react';
+import appIcon from '../assets/app-icon.png';
 import { cn } from '../lib/cn';
 import { Button } from '../components/ui/Button';
 import { Input, Label } from '../components/ui/Input';
@@ -150,7 +151,7 @@ const LoginPage = () => {
           className="order-2 md:order-1"
         >
           <div className="inline-flex items-center gap-2 rounded-full border-2 border-ink-900/10 bg-cream-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-700">
-            <Flame size={14} className="text-tangerine-500" />
+            <img src={appIcon} alt="" className="h-4 w-4 rounded-full object-cover" />
             Workplace Challenge Edition
           </div>
 
@@ -191,9 +192,11 @@ const LoginPage = () => {
             <div className="absolute -bottom-16 -left-10 h-36 w-36 rounded-full bg-grape-50" aria-hidden />
 
             <div className="relative">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-ink-900 text-tangerine-300">
-                <Flame size={22} />
-              </div>
+              <img
+                src={appIcon}
+                alt="Lose It Loud"
+                className="h-24 w-24 rounded-2xl object-cover"
+              />
               <h2 className="mt-5 font-display text-3xl font-bold">Sign in</h2>
               <p className="mt-1 text-sm text-ink-500">
                 Use your Unosquare Microsoft account

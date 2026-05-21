@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router';
-import { LayoutDashboard, Trophy, Shield, UserCircle2, LogOut, Flame, Sun, Moon, NotebookPen } from 'lucide-react';
+import { LayoutDashboard, Trophy, Shield, UserCircle2, LogOut, Sun, Moon, NotebookPen } from 'lucide-react';
+import appIcon from '../assets/app-icon.png';
 import { useAuthStore } from '../store/authStore';
 import { useUiStore } from '../store/uiStore';
 import { Avatar } from './ui/Avatar';
@@ -52,9 +53,11 @@ export const Layout = ({ children }: LayoutProps) => {
             className="flex items-center gap-2 group"
             aria-label="Home"
           >
-            <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-ink-900 text-tangerine-300 ring-pop">
-              <Flame size={20} className="group-hover:rotate-12 transition" />
-            </span>
+            <img
+              src={appIcon}
+              alt="Lose It Loud"
+              className="h-10 w-10 rounded-2xl object-cover ring-pop group-hover:scale-105 transition"
+            />
             <div className="hidden sm:block text-left leading-tight">
               <p className="font-display text-lg font-bold text-ink-900">Lose It Loud</p>
               <p className="text-[10px] uppercase tracking-[0.18em] text-ink-500 font-semibold">
