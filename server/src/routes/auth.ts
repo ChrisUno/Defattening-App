@@ -126,13 +126,19 @@ router.post('/entra', asyncHandler(async (req, res) => {
     if (byOid.rows.length > 0) {
       userRow = byOid.rows[0];
     } else {
-      const byEmail = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+      const byEmail = email
+        ? await pool.query('SELECT * FROM users WHERE email = $1', [email])
+        : { rows: [] };
       if (byEmail.rows.length > 0) {
         userRow = byEmail.rows[0];
-        if (!userRow.entra_oid) {
+        if (userRow.entra_oid !== oid) {
           await pool.query('UPDATE users SET entra_oid = $1 WHERE id = $2', [oid, userRow.id]);
           userRow.entra_oid = oid;
         }
+      } else if (!email) {
+        console.error('Entra auth: token missing email claims, cannot create or match user');
+        res.status(400).json({ message: 'Email claim missing from token' });
+        return;
       } else {
         const id = crypto.randomUUID();
         const color = pickColor();
