@@ -79,12 +79,17 @@ router.get('/status', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
+  const userId = req.session.userId!;
   const { sessionId } = req.query;
   if (!sessionId) {
     res.status(400).json({ message: 'sessionId query param is required' });
     return;
   }
-  const { rows } = await pool.query('SELECT * FROM weigh_ins WHERE session_id = $1 ORDER BY week_index', [sessionId]);
+  // Only return current user's weigh-ins
+  const { rows } = await pool.query(
+    'SELECT * FROM weigh_ins WHERE session_id = $1 AND user_id = $2 ORDER BY week_index',
+    [sessionId, userId],
+  );
   res.json(rows.map(toWeighIn));
 }));
 

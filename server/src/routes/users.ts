@@ -8,9 +8,20 @@ import { pickColor } from '../lib/avatarColors.js';
 
 const router = Router();
 
-router.get('/', requireAuth, asyncHandler(async (_req, res) => {
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
+  const currentUserId = req.session.userId!;
+  const { rows: callerRows } = await pool.query('SELECT role FROM users WHERE id = $1', [currentUserId]);
+  const isAdmin = callerRows[0] && ['admin', 'super_admin'].includes(callerRows[0].role);
+
   const { rows } = await pool.query('SELECT * FROM users ORDER BY created_at');
-  res.json(rows.map(toUser));
+  res.json(rows.map((row: any) => {
+    const u = toUser(row);
+    // Strip heightCm for non-self, non-admin — height is personal data
+    if (!isAdmin && u.id !== currentUserId) {
+      return { ...u, heightCm: null };
+    }
+    return u;
+  }));
 }));
 
 router.post('/', requireAdmin, asyncHandler(async (req, res) => {

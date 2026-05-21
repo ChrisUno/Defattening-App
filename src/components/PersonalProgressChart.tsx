@@ -44,7 +44,7 @@ export const PersonalProgressChart = ({
       allWeeks.push({
         label: `Wk ${i + 1}`,
         weight: existing?.weight,
-        goal: participation.goalWeightKg,
+        goal: participation.goalWeightKg ?? 0,
       });
     }
     return allWeeks;
@@ -95,11 +95,11 @@ export const PersonalProgressChart = ({
             }}
           />
           <ReferenceLine
-            y={participation.startWeightKg}
+            y={participation.startWeightKg ?? 0}
             stroke={tokens.secondary}
             strokeDasharray="3 3"
             label={{
-              value: `Start ${participation.startWeightKg.toFixed(1)}kg`,
+              value: `Start ${(participation.startWeightKg ?? 0).toFixed(1)}kg`,
               fill: tokens.secondary,
               fontSize: 10,
               fontWeight: 700,
@@ -107,11 +107,11 @@ export const PersonalProgressChart = ({
             }}
           />
           <ReferenceLine
-            y={participation.goalWeightKg}
+            y={participation.goalWeightKg ?? 0}
             stroke={tokens.success}
             strokeDasharray="3 3"
             label={{
-              value: `Goal ${participation.goalWeightKg.toFixed(1)}kg`,
+              value: `Goal ${(participation.goalWeightKg ?? 0).toFixed(1)}kg`,
               fill: tokens.successDark,
               fontSize: 10,
               fontWeight: 700,

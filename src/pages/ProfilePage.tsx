@@ -82,7 +82,7 @@ const ProfilePage = () => {
     if (!session) return null;
     const week = currentWeekIndex(session);
     const carry = carryForwardWeights(active, allWeighIns, week);
-    return carry[carry.length - 1] ?? active.startWeightKg;
+    return carry[carry.length - 1] ?? active.startWeightKg ?? 0;
   }, [user, myParts, sessions, allWeighIns]);
 
   const currentBmi = useMemo<number | null>(() => {
@@ -306,11 +306,11 @@ const ProfilePage = () => {
                 <div className="mt-4 rounded-2xl bg-cream-50 border-2 border-ink-900/5 p-3 text-xs text-ink-500">
                   Start{' '}
                   <span className="font-bold text-ink-900 tabular-nums">
-                    {part.startWeightKg.toFixed(1)} kg
+                    {(part.startWeightKg ?? 0).toFixed(1)} kg
                   </span>{' '}
                   · Goal{' '}
                   <span className="font-bold text-ink-900 tabular-nums">
-                    {part.goalWeightKg.toFixed(1)} kg
+                    {(part.goalWeightKg ?? 0).toFixed(1)} kg
                   </span>{' '}
                   · Current{' '}
                   <span className="font-bold text-ink-900 tabular-nums">

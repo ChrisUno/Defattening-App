@@ -155,8 +155,8 @@ export const BmiDialog = ({
   }
 
   const breakdown = buildBmiBreakdown(currentWeightKg, user.heightCm);
-  const startBreakdown = buildBmiBreakdown(participation.startWeightKg, user.heightCm);
-  const goalBreakdown = buildBmiBreakdown(participation.goalWeightKg, user.heightCm);
+  const startBreakdown = buildBmiBreakdown(participation.startWeightKg ?? 0, user.heightCm);
+  const goalBreakdown = buildBmiBreakdown(participation.goalWeightKg ?? 0, user.heightCm);
   const weeklyLoss = averageWeeklyLossKg(participation, weighIns, weekIndex);
   const projection = projectToHealthyBmi(
     breakdown,
@@ -337,7 +337,7 @@ export const BmiDialog = ({
           <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
             <PathTick
               label="Started at"
-              kg={participation.startWeightKg}
+              kg={participation.startWeightKg ?? 0}
               bmi={startBreakdown.bmi}
             />
             <PathTick
@@ -348,7 +348,7 @@ export const BmiDialog = ({
             />
             <PathTick
               label="Your goal"
-              kg={participation.goalWeightKg}
+              kg={participation.goalWeightKg ?? 0}
               bmi={goalBreakdown.bmi}
             />
           </div>

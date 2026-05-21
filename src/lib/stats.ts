@@ -58,14 +58,14 @@ export const carryForwardWeights = (
   ).sort((a, b) => a.weekIndex - b.weekIndex);
 
   const result: (number | null)[] = [];
-  let last: number = participation.startWeightKg;
+  let last: number = participation.startWeightKg ?? 0;
   for (let i = 0; i <= upToWeekInclusive; i += 1) {
     const direct = userWeighIns.find((w) => w.weekIndex === i);
     if (direct) {
       last = direct.weightKg;
       result.push(last);
     } else if (i === 0) {
-      result.push(participation.startWeightKg);
+      result.push(participation.startWeightKg ?? 0);
     } else {
       result.push(last);
     }
@@ -79,15 +79,15 @@ export const weeklyPointsFor = (
   upToWeekInclusive: number,
 ): WeeklyPoint[] => {
   const weights = carryForwardWeights(participation, weighIns, upToWeekInclusive);
-  const start = participation.startWeightKg;
+  const start = participation.startWeightKg ?? 0;
   return weights.map((weight, i) => {
     const prev = i === 0 ? start : weights[i - 1] ?? start;
     const w = weight ?? start;
     return {
       weekIndex: i,
       weightKg: w,
-      pctFromStart: ((start - w) / start) * 100,
-      delta: ((prev - w) / prev) * 100,
+      pctFromStart: start ? ((start - w) / start) * 100 : 0,
+      delta: prev ? ((prev - w) / prev) * 100 : 0,
     };
   });
 };
@@ -132,7 +132,7 @@ export const computeParticipantStats = (
     weeklyDelta,
     bestWeekLoss,
     currentLossStreak: longestLossStreak(points),
-    currentWeightKg: latest?.weightKg ?? participation.startWeightKg,
+    currentWeightKg: latest?.weightKg ?? participation.startWeightKg ?? 0,
     startWeightKg: participation.startWeightKg,
     weeksLogged: distinctWeeksLogged,
   };

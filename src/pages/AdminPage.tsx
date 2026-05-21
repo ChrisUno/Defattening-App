@@ -851,8 +851,8 @@ const EditUserDialog = ({ user, onClose, onSave, onTempAdminChange, isSuperAdmin
           return {
             id: p.id,
             sessionName: session?.name ?? '—',
-            startWeightKg: p.startWeightKg.toFixed(1),
-            goalWeightKg: p.goalWeightKg.toFixed(1),
+            startWeightKg: (p.startWeightKg ?? 0).toFixed(1),
+            goalWeightKg: (p.goalWeightKg ?? 0).toFixed(1),
           };
         }),
     );

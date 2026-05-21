@@ -28,8 +28,8 @@ export interface Participation {
   id: string;
   userId: string;
   sessionId: string;
-  startWeightKg: number;
-  goalWeightKg: number;
+  startWeightKg: number | null;
+  goalWeightKg: number | null;
   joinedAt: string;
 }
 
@@ -62,7 +62,7 @@ export interface ParticipantStats {
   bestWeekLoss: number;
   currentLossStreak: number;
   currentWeightKg: number | null;
-  startWeightKg: number;
+  startWeightKg: number | null;
   weeksLogged: number;
 }
 

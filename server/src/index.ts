@@ -17,6 +17,7 @@ import participationRoutes from './routes/participations.js';
 import weighInRoutes from './routes/weighIns.js';
 import journalRoutes from './routes/journals.js';
 import activityRoutes from './routes/activity.js';
+import leaderboardRoutes from './routes/leaderboard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PgStore = connectPgSimple(session);
@@ -86,6 +87,7 @@ app.use('/api/participations', participationRoutes);
 app.use('/api/weigh-ins', weighInRoutes);
 app.use('/api/journals', journalRoutes);
 app.use('/api/activity', activityRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 
 const distPath = path.join(__dirname, '..', '..', 'dist');
 if (isProduction && fs.existsSync(distPath)) {

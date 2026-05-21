@@ -80,7 +80,7 @@ export const WeighInModal = ({ open, onClose, onSuccess }: WeighInModalProps) =>
     } else {
       const points = weeklyPointsFor(participation, weighIns, Math.max(initialWeekIdx - 1, 0));
       const latest = points[points.length - 1];
-      setWeight(latest ? latest.weightKg.toFixed(1) : participation.startWeightKg.toFixed(1));
+      setWeight(latest ? latest.weightKg.toFixed(1) : (participation.startWeightKg ?? 0).toFixed(1));
       const lastBf = [...weighIns]
         .filter((w) => w.userId === user.id && w.sessionId === session.id && w.bodyFatPct != null)
         .sort((a, b) => b.weekIndex - a.weekIndex)[0];

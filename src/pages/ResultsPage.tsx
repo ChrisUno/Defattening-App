@@ -9,15 +9,13 @@ import { Avatar } from '../components/ui/Avatar';
 import { ConfettiBurst } from '../components/ConfettiBurst';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
-import { computeLeaderboard, formatPct } from '../lib/stats';
+import { formatPct } from '../lib/stats';
 import { api } from '../lib/api';
-import type { WeighIn } from '../types';
+import type { ParticipantStats } from '../types';
 
 const ResultsPage = () => {
   const navigate = useNavigate();
-  const users = useDataStore((s) => s.users);
   const sessions = useDataStore((s) => s.sessions);
-  const participations = useDataStore((s) => s.participations);
 
   const user = useAuthStore((s) => s.currentUser);
 
@@ -28,19 +26,16 @@ const ResultsPage = () => {
 
   const [sessionId, setSessionId] = useState<string>(completed[0]?.id ?? '');
   const [confettiTick, setConfettiTick] = useState(1);
-  const [completedWeighIns, setCompletedWeighIns] = useState<WeighIn[]>([]);
+  const [board, setBoard] = useState<ParticipantStats[]>([]);
 
   const session = completed.find((s) => s.id === sessionId) ?? completed[0];
 
   useEffect(() => {
     if (!session) return;
-    api.get<WeighIn[]>(`/api/weigh-ins?sessionId=${session.id}`).then(setCompletedWeighIns).catch(() => {});
+    api.get<{ board: ParticipantStats[] }>(`/api/leaderboard?sessionId=${session.id}`)
+      .then((res) => setBoard(res.board))
+      .catch(() => {});
   }, [session?.id]);
-
-  const board = useMemo(() => {
-    if (!session) return [];
-    return computeLeaderboard(session, users, participations, completedWeighIns, session.weeks - 1);
-  }, [session, users, participations, completedWeighIns]);
 
   if (!session) {
     return (

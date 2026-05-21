@@ -7,16 +7,13 @@ import { toJournal } from '../lib/mappers.js';
 const router = Router();
 
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
-  const { sessionId, userId } = req.query;
-  let rows: any[];
+  const currentUserId = req.session.userId!;
+  const { sessionId } = req.query;
 
-  if (sessionId && userId) {
-    ({ rows } = await pool.query('SELECT * FROM journals WHERE session_id = $1 AND user_id = $2 ORDER BY week_index', [sessionId, userId]));
-  } else if (sessionId) {
-    ({ rows } = await pool.query('SELECT * FROM journals WHERE session_id = $1 ORDER BY week_index', [sessionId]));
-  } else {
-    ({ rows } = await pool.query('SELECT * FROM journals WHERE user_id = $1 ORDER BY week_index', [req.session.userId!]));
-  }
+  // Only return current user's journals — journal content is private
+  const { rows } = sessionId
+    ? await pool.query('SELECT * FROM journals WHERE session_id = $1 AND user_id = $2 ORDER BY week_index', [sessionId, currentUserId])
+    : await pool.query('SELECT * FROM journals WHERE user_id = $1 ORDER BY week_index', [currentUserId]);
 
   res.json(rows.map(toJournal));
 }));

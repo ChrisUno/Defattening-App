@@ -75,7 +75,7 @@ interface WeeklyPoint {
   delta: number;
 }
 
-const weeklyPointsFor = (
+export const weeklyPointsFor = (
   participation: Participation,
   weighIns: WeighIn[],
   upToWeekInclusive: number,

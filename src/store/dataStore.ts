@@ -5,6 +5,7 @@ import type {
   ActivityEntry,
   JournalEntry,
   Participation,
+  ParticipantStats,
   Session,
   User,
   WeighIn,
@@ -17,6 +18,19 @@ export interface WeighInStatus {
   weighInDayOfWeek: number;
 }
 
+export interface WeeklyPctSeriesEntry {
+  userId: string;
+  userName: string;
+  avatarColor: string;
+  points: { weekIndex: number; pctFromStart: number }[];
+}
+
+interface LeaderboardResponse {
+  board: ParticipantStats[];
+  sessionTotalLostKg: number;
+  weeklyPctSeries: WeeklyPctSeriesEntry[];
+}
+
 interface DataState {
   users: User[];
   sessions: Session[];
@@ -25,6 +39,9 @@ interface DataState {
   journals: JournalEntry[];
   activityFeed: ActivityEntry[];
   weighInStatuses: WeighInStatus[];
+  leaderboard: ParticipantStats[];
+  weeklyPctSeries: WeeklyPctSeriesEntry[];
+  sessionTotalLostKg: number;
   activeSessionId: string;
   isHydrated: boolean;
 
@@ -66,12 +83,15 @@ export const useDataStore = create<DataState>((set, get) => ({
   journals: [],
   activityFeed: [],
   weighInStatuses: [],
+  leaderboard: [],
+  weeklyPctSeries: [],
+  sessionTotalLostKg: 0,
   activeSessionId: '',
   isHydrated: false,
 
-  setActiveSession: (sessionId) => {
+  setActiveSession: async (sessionId) => {
     set({ activeSessionId: sessionId });
-    get().hydrateSessionData(sessionId);
+    await get().hydrateSessionData(sessionId);
   },
 
   hydrate: async (sessionId?) => {
@@ -93,6 +113,9 @@ export const useDataStore = create<DataState>((set, get) => ({
         let weighIns: WeighIn[] = [];
         let journals: JournalEntry[] = [];
         let activityFeed: ActivityEntry[] = [];
+        let leaderboard: ParticipantStats[] = [];
+        let weeklyPctSeries: WeeklyPctSeriesEntry[] = [];
+        let sessionTotalLostKg = 0;
 
         if (active) {
           [weighIns, journals, activityFeed] = await Promise.all([
@@ -100,6 +123,13 @@ export const useDataStore = create<DataState>((set, get) => ({
             api.get<JournalEntry[]>(`/api/journals?sessionId=${active}`),
             api.get<ActivityEntry[]>(`/api/activity?sessionId=${active}`),
           ]);
+
+          try {
+            const lb = await api.get<LeaderboardResponse>(`/api/leaderboard?sessionId=${active}`);
+            leaderboard = lb.board;
+            weeklyPctSeries = lb.weeklyPctSeries;
+            sessionTotalLostKg = lb.sessionTotalLostKg;
+          } catch { /* non-critical */ }
         }
 
         let weighInStatuses: WeighInStatus[] = [];
@@ -107,7 +137,7 @@ export const useDataStore = create<DataState>((set, get) => ({
           weighInStatuses = await api.get<WeighInStatus[]>('/api/weigh-ins/status');
         } catch { /* non-critical */ }
 
-        set({ users, sessions, participations, weighIns, journals, activityFeed, weighInStatuses, activeSessionId: active, isHydrated: true });
+        set({ users, sessions, participations, weighIns, journals, activityFeed, weighInStatuses, leaderboard, weeklyPctSeries, sessionTotalLostKg, activeSessionId: active, isHydrated: true });
       } finally {
         hydrateInFlight = null;
       }
@@ -123,7 +153,18 @@ export const useDataStore = create<DataState>((set, get) => ({
       api.get<JournalEntry[]>(`/api/journals?sessionId=${sessionId}`),
       api.get<ActivityEntry[]>(`/api/activity?sessionId=${sessionId}`),
     ]);
-    set({ weighIns, journals, activityFeed });
+
+    let leaderboard: ParticipantStats[] = [];
+    let weeklyPctSeries: WeeklyPctSeriesEntry[] = [];
+    let sessionTotalLostKg = 0;
+    try {
+      const lb = await api.get<LeaderboardResponse>(`/api/leaderboard?sessionId=${sessionId}`);
+      leaderboard = lb.board;
+      weeklyPctSeries = lb.weeklyPctSeries;
+      sessionTotalLostKg = lb.sessionTotalLostKg;
+    } catch { /* non-critical */ }
+
+    set({ weighIns, journals, activityFeed, leaderboard, weeklyPctSeries, sessionTotalLostKg });
   },
 
   addUser: async (input) => {
@@ -242,6 +283,12 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       return { weighIns: nextWeighIns, activityFeed: nextActivity, weighInStatuses: nextStatuses };
     });
+
+    // Refresh server-side leaderboard after recording
+    try {
+      const lb = await api.get<LeaderboardResponse>(`/api/leaderboard?sessionId=${input.sessionId}`);
+      set({ leaderboard: lb.board, weeklyPctSeries: lb.weeklyPctSeries, sessionTotalLostKg: lb.sessionTotalLostKg });
+    } catch { /* non-critical */ }
 
     return result;
   },

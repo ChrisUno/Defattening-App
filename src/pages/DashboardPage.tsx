@@ -46,7 +46,6 @@ import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
 import {
   carryForwardWeights,
-  computeLeaderboard,
   computeParticipantStats,
   currentWeekIndex,
   findPursuer,
@@ -66,6 +65,8 @@ const DashboardPage = () => {
   const journals = useDataStore((s) => s.journals);
   const activityFeed = useDataStore((s) => s.activityFeed);
   const activeSessionId = useDataStore((s) => s.activeSessionId);
+  const serverLeaderboard = useDataStore((s) => s.leaderboard);
+  const serverSessionTotalLostKg = useDataStore((s) => s.sessionTotalLostKg);
   const updateParticipation = useDataStore((s) => s.updateParticipation);
   const user = useAuthStore((s) => s.currentUser);
 
@@ -89,10 +90,7 @@ const DashboardPage = () => {
 
   const weekIdx = session ? currentWeekIndex(session) : 0;
 
-  const leaderboard = useMemo(
-    () => session ? computeLeaderboard(session, users, participations, weighIns, weekIdx) : [],
-    [session, users, participations, weighIns, weekIdx],
-  );
+  const leaderboard = serverLeaderboard;
 
   const rivalInfo = useMemo(
     () => (user ? findRival(leaderboard, user.id) : null),
@@ -155,17 +153,12 @@ const DashboardPage = () => {
   const daysAway = differenceInCalendarDays(nextWeighInDate, today);
 
   const weights = !needsJoin ? carryForwardWeights(participation, weighIns, weekIdx) : [];
-  const currentWeight = !needsJoin ? (weights[weights.length - 1] ?? participation.startWeightKg) : 0;
-  const totalLostKg = !needsJoin ? participation.startWeightKg - currentWeight : 0;
-  const goalDeltaKg = !needsJoin ? currentWeight - participation.goalWeightKg : 0;
+  const currentWeight = !needsJoin ? (weights[weights.length - 1] ?? participation.startWeightKg ?? 0) : 0;
+  const totalLostKg = !needsJoin ? (participation.startWeightKg ?? 0) - currentWeight : 0;
+  const goalDeltaKg = !needsJoin ? currentWeight - (participation.goalWeightKg ?? 0) : 0;
   const currentBodyFat = !needsJoin ? latestBodyFatPct(user.id, session.id, weighIns) : null;
 
-  const sessionTotalLostKg = useMemo(() => {
-    return leaderboard.reduce((sum, stat) => {
-      const lost = stat.startWeightKg - (stat.currentWeightKg ?? stat.startWeightKg);
-      return sum + Math.max(0, lost);
-    }, 0);
-  }, [leaderboard]);
+  const sessionTotalLostKg = serverSessionTotalLostKg;
 
   const myComparison = useMemo(
     () => totalLostKg > 0 ? getWeightComparison(totalLostKg) : null,
@@ -178,7 +171,7 @@ const DashboardPage = () => {
   );
 
   const weeksToGoal = useMemo(
-    () => !needsJoin ? getWeeksToGoal(currentWeight, participation.goalWeightKg, totalLostKg, weekIdx + 1) : null,
+    () => !needsJoin ? getWeeksToGoal(currentWeight, participation.goalWeightKg ?? 0, totalLostKg, weekIdx + 1) : null,
     [needsJoin, currentWeight, participation?.goalWeightKg, totalLostKg, weekIdx],
   );
 
@@ -400,9 +393,9 @@ const DashboardPage = () => {
           </p>
           <h3 className="font-display text-xl font-bold mt-1">Only you can see this</h3>
           <dl className="mt-6 space-y-4 flex-1">
-            <PrivateRow label="Start weight" value={`${participation.startWeightKg.toFixed(1)} kg`} />
+            <PrivateRow label="Start weight" value={`${(participation.startWeightKg ?? 0).toFixed(1)} kg`} />
             <PrivateRow label="Current weight" value={`${currentWeight.toFixed(1)} kg`} highlight />
-            <PrivateRow label="Goal weight" value={`${participation.goalWeightKg.toFixed(1)} kg`} />
+            <PrivateRow label="Goal weight" value={`${(participation.goalWeightKg ?? 0).toFixed(1)} kg`} />
             {currentBodyFat != null && (
               <PrivateRow
                 label="Body fat"
@@ -714,8 +707,8 @@ const DashboardPage = () => {
       <EditDataDialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        startWeight={participation.startWeightKg}
-        goalWeight={participation.goalWeightKg}
+        startWeight={participation.startWeightKg ?? 0}
+        goalWeight={participation.goalWeightKg ?? 0}
         onSave={async (s, g) => {
           await updateParticipation(participation.id, { startWeightKg: s, goalWeightKg: g });
           setEditOpen(false);

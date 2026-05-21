@@ -7,11 +7,20 @@ import { toParticipation } from '../lib/mappers.js';
 const router = Router();
 
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
+  const currentUserId = req.session.userId!;
+  const { rows: userRows } = await pool.query('SELECT role FROM users WHERE id = $1', [currentUserId]);
+  const isAdmin = userRows[0] && ['admin', 'super_admin'].includes(userRows[0].role);
+
   const { sessionId } = req.query;
   const { rows } = sessionId
     ? await pool.query('SELECT * FROM participations WHERE session_id = $1', [sessionId])
     : await pool.query('SELECT * FROM participations');
-  res.json(rows.map(toParticipation));
+
+  res.json(rows.map((row: any) => {
+    const p = toParticipation(row);
+    if (isAdmin || p.userId === currentUserId) return p;
+    return { ...p, startWeightKg: null, goalWeightKg: null };
+  }));
 }));
 
 router.post('/', requireAuth, asyncHandler(async (req, res) => {
@@ -50,6 +59,14 @@ router.patch('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { rows: existing } = await pool.query('SELECT * FROM participations WHERE id = $1', [id]);
   if (existing.length === 0) {
     res.status(404).json({ message: 'Participation not found' });
+    return;
+  }
+
+  // Ownership check: only owner or admin can modify
+  const { rows: userRows } = await pool.query('SELECT role FROM users WHERE id = $1', [req.session.userId!]);
+  const isAdmin = userRows[0] && ['admin', 'super_admin'].includes(userRows[0].role);
+  if (existing[0].user_id !== req.session.userId && !isAdmin) {
+    res.status(403).json({ message: 'Cannot modify another user\'s participation' });
     return;
   }
 

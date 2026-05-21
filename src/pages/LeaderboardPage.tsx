@@ -26,12 +26,11 @@ import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
 import { useAuthStore } from '../store/authStore';
 import { useDataStore } from '../store/dataStore';
+import type { ParticipantStats } from '../types';
 import {
-  computeLeaderboard,
   computeParticipantStats,
   currentWeekIndex,
   formatPct,
-  weeklyPointsFor,
 } from '../lib/stats';
 import { cn } from '../lib/cn';
 import { useChartTokens } from '../lib/chartTheme';
@@ -48,12 +47,13 @@ const sortLabels: Record<SortKey, string> = {
 type FilterMode = 'all' | 'losers' | 'streakers' | 'me-vs-top';
 
 const LeaderboardPage = () => {
-  const users = useDataStore((s) => s.users);
   const sessions = useDataStore((s) => s.sessions);
   const participations = useDataStore((s) => s.participations);
   const weighIns = useDataStore((s) => s.weighIns);
   const activityFeed = useDataStore((s) => s.activityFeed);
   const activeSessionId = useDataStore((s) => s.activeSessionId);
+  const serverBoard = useDataStore((s) => s.leaderboard);
+  const serverPctSeries = useDataStore((s) => s.weeklyPctSeries);
   const user = useAuthStore((s) => s.currentUser);
   const tokens = useChartTokens();
 
@@ -65,10 +65,7 @@ const LeaderboardPage = () => {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<FilterMode>('all');
 
-  const board = useMemo(
-    () => session ? computeLeaderboard(session, users, participations, weighIns, weekIdx) : [],
-    [session, users, participations, weighIns, weekIdx],
-  );
+  const board = serverBoard;
 
   const recentMovers = useMemo(() => {
     if (!session) return new Set<string>();
@@ -136,18 +133,15 @@ const LeaderboardPage = () => {
     for (let w = 0; w <= weekIdx; w += 1) {
       const row: { week: string; [k: string]: number | string } = { week: `Wk ${w + 1}` };
       visible.forEach((stat) => {
-        const part = participations.find(
-          (p) => p.userId === stat.userId && p.sessionId === session.id,
-        );
-        if (!part) return;
-        const points = weeklyPointsFor(part, weighIns, w);
-        const latest = points[points.length - 1];
-        row[stat.userName] = +(latest?.pctFromStart ?? 0).toFixed(2);
+        const entry = serverPctSeries.find((e) => e.userId === stat.userId);
+        if (!entry) return;
+        const point = entry.points.find((p) => p.weekIndex === w);
+        row[stat.userName] = +(point?.pctFromStart ?? 0).toFixed(2);
       });
       series.push(row);
     }
     return { series, visible };
-  }, [filtered, weekIdx, participations, weighIns, session?.id]);
+  }, [filtered, weekIdx, serverPctSeries, session?.id]);
 
   if (!user || !session) return null;
 
@@ -472,7 +466,7 @@ const LeaderboardPage = () => {
 
 interface PodiumCardProps {
   rank: number;
-  stat: ReturnType<typeof computeLeaderboard>[number] | undefined;
+  stat: ParticipantStats | undefined;
   accent: string;
   glow?: boolean;
 }
