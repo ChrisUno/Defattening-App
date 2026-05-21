@@ -117,7 +117,7 @@ router.post('/entra', asyncHandler(async (req, res) => {
     }
 
     const oid: string = claims.oid;
-    const email: string = (claims.preferred_username || claims.email || '').toLowerCase();
+    const email: string = (claims.preferred_username || claims.email || claims.unique_name || claims.upn || '').toLowerCase();
     const name: string = claims.name || email.split('@')[0];
 
     let userRow: any = null;
