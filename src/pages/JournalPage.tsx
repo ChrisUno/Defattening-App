@@ -38,7 +38,7 @@ import {
 // ---------------------------------------------------------------------------
 const MAX_CHARS = 5000;
 const WARN_THRESHOLD = 4500;
-const DEBOUNCE_MS = 2000;
+const DEBOUNCE_MS = 5000;
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -174,9 +174,12 @@ const CurrentWeekEditor = ({ sessionId, weekIndex, existing }: CurrentWeekEditor
             </span>
           )}
           {saveStatus === 'error' && (
-            <span className="inline-flex items-center gap-1 text-xs text-rose-bright">
-              <AlertCircle size={12} /> Save failed
-            </span>
+            <button
+              onClick={flush}
+              className="inline-flex items-center gap-1 text-xs text-rose-bright hover:underline"
+            >
+              <AlertCircle size={12} /> Save failed — tap to retry
+            </button>
           )}
         </div>
       </div>

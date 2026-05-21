@@ -212,7 +212,7 @@ const LoginPage = () => {
                 type="button"
                 onClick={handleEntraSignIn}
                 disabled={entraLoading || loading}
-                className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border-2 border-ink-900/15 bg-white px-5 py-3.5 text-sm font-semibold text-ink-900 shadow-sm hover:bg-ink-50 hover:border-ink-900/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="mt-6 w-full flex items-center justify-center gap-3 rounded-xl border-2 border-ink-900/15 bg-cream-100 px-5 py-3.5 text-sm font-semibold text-ink-900 shadow-sm hover:bg-cream-200 hover:border-ink-900/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {entraLoading ? (
                   <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-ink-300 border-t-ink-900" />

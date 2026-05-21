@@ -70,9 +70,13 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   req.session.userId = user.id;
-  res.json({
-    user: toUser(user),
-    hasActiveParticipation: await hasActiveParticipation(user.id),
+  const active = await hasActiveParticipation(user.id);
+  req.session.save((err) => {
+    if (err) {
+      res.status(500).json({ message: 'Session creation failed' });
+      return;
+    }
+    res.json({ user: toUser(user), hasActiveParticipation: active });
   });
 }));
 
@@ -153,9 +157,13 @@ router.post('/entra', asyncHandler(async (req, res) => {
     }
 
     req.session.userId = userRow.id;
-    res.json({
-      user: toUser(userRow),
-      hasActiveParticipation: await hasActiveParticipation(userRow.id),
+    const active = await hasActiveParticipation(userRow.id);
+    req.session.save((err) => {
+      if (err) {
+        res.status(500).json({ message: 'Session creation failed' });
+        return;
+      }
+      res.json({ user: toUser(userRow), hasActiveParticipation: active });
     });
   } catch (err: any) {
     console.error('Entra auth error:', err.message);
